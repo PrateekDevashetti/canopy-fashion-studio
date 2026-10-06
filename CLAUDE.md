@@ -38,6 +38,15 @@ shoot → review). Spec: `docs/PRD.md`. Work queue: `docs/TASKS.md` — **tick t
   Recolor adds a Lab colour-accuracy pass (`matchGarmentColor`). Photo Shoot / Multi-Angle add face + outfit close-ups.
 - Masks must stay single-channel raw in `maskAlpha` (an encode round-trip turns them 3-channel and misplaces composites).
 
+## Production (2026-10-06)
+- Web: Vercel `canopy-fashion-studio` (team prateekdevashettis-projects, root `apps/web`) → https://canopy-fashion-studio.vercel.app.
+  Deploy = `vercel deploy` (preview, behind Vercel auth — use `vercel curl`) → verify → `vercel promote <url>`.
+- Worker: Railway project `canopy-fashion-studio`, service `fashion-worker` (root `Dockerfile`), `railway up --service fashion-worker`.
+- DB: Neon project `canopy-fashion-studio` (`noisy-water-24376320`, aws-us-east-1, org `org-young-cell-99556107`), created
+  with `neonctl` (Vercel's Neon integration needs browser terms). Web uses the `-pooler` host. Schema baseline:
+  `packages/core/migrations/0000_baseline.sql` + later numbered files (apply with psql).
+- Storage: R2 `canopy-assets` under `S3_PREFIX` (shared with floraxfauna). Auth: Clerk dev instance shared with the canvas.
+
 ## Ops
 - Schema changes: edit `schema.ts` **and** add an idempotent SQL file in `packages/core/migrations/`.
 - Rate limits (`ratelimit.ts`) via `route(handler, { limit })`; security events are JSON log lines `level: "security"`.
