@@ -91,10 +91,28 @@ export const assets = pgTable(
     /** Detected garment regions, cached after the first auto-detect. */
     segments: jsonb("segments").$type<Segment[] | null>(),
     shareToken: text("share_token"),
+    /** Feed "Mark" — flag looks for the team's shortlist. */
+    marked: boolean("marked").notNull().default(false),
+    /** "Save to Assets" — kept in the workspace library across projects. */
+    saved: boolean("saved").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => [index("assets_project_idx").on(t.projectId, t.createdAt), index("assets_run_idx").on(t.runId), index("assets_share_idx").on(t.shareToken)],
+);
+
+/** "Share for review": comments + approvals collected on shared looks. */
+export const reviewComments = pgTable(
+  "review_comments",
+  {
+    id: text("id").primaryKey(),
+    assetId: text("asset_id").notNull(),
+    author: text("author").notNull(),
+    body: text("body").notNull().default(""),
+    verdict: text("verdict").$type<"approve" | "changes" | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("review_asset_idx").on(t.assetId, t.createdAt)],
 );
 
 export const creditLedger = pgTable(

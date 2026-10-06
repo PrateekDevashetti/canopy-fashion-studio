@@ -12,6 +12,7 @@ export const POST = route<Ctx>(async (req, user, { params }) => {
   if (!a) throw new HttpError(404, "Image not found");
   await requireProject(a.projectId, user.id, "edit");
   const refresh = new URL(req.url).searchParams.get("refresh") === "1";
+  if (user.guest && (refresh || !a.segments?.length)) throw new HttpError(403, "Sign up to try out Fashion Studio!");
   try {
     const segments = await detectGarments(a, { refresh });
     return json({ segments: segments.map((s) => ({ ...s, maskUrl: fileUrl(s.maskKey) })) });
@@ -19,4 +20,4 @@ export const POST = route<Ctx>(async (req, user, { params }) => {
     console.error("[detect]", e);
     throw new HttpError(502, "Couldn't detect garments on this image. Try again, or select by hand.");
   }
-});
+}, { guests: true });

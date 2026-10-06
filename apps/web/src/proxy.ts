@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest, type NextFetchEvent } from "next/server
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const clerkOn = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
-const isApp = createRouteMatcher(["/studio(.*)", "/studios(.*)", "/settings(.*)"]);
+const isApp = createRouteMatcher(["/studios(.*)", "/settings(.*)"]);
 
 const withClerk = clerkMiddleware(async (auth, req) => {
   if (isApp(req)) await auth.protect();

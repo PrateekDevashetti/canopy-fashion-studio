@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return clerkOn ? (
     <ClerkProvider
       appearance={{
-        variables: { colorPrimary: "#5bc466", colorBackground: "#141414", colorText: "#f2f2f2", colorInputBackground: "#1c1c1c", colorInputText: "#f2f2f2", borderRadius: "10px", fontFamily: "var(--font-dm-sans)" },
+        variables: { colorPrimary: "#5bc466", colorBackground: "#141414", borderRadius: "10px", fontFamily: "var(--font-dm-sans)" },
       }}
       localization={{
         signIn: { start: { title: "Sign in to Fashion Studio", subtitle: "Welcome back. Pick up where your collection left off." } },

@@ -15,4 +15,4 @@ export const GET = route<Ctx>(async (req, user, { params }) => {
   const stuck = runs.filter((r) => r.status === "queued" && Date.now() - Date.parse(r.createdAt) > 45_000).map((r) => r.id);
   if (stuck.length) after(() => kickStale(stuck));
   return json({ runs });
-});
+}, { guests: true });

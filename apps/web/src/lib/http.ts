@@ -6,11 +6,13 @@ import { getSessionUser, type SessionUser } from "./auth";
 export const json = (data: unknown, init?: number | ResponseInit) => NextResponse.json(data, typeof init === "number" ? { status: init } : init);
 
 /** Wrap an authenticated route: resolves the user and maps errors to JSON responses. */
-export function route<C = { params: Promise<Record<string, string>> }>(handler: (req: Request, user: SessionUser, ctx: C) => Promise<Response>) {
+export function route<C = { params: Promise<Record<string, string>> }>(handler: (req: Request, user: SessionUser, ctx: C) => Promise<Response>, opts: { guests?: boolean } = {}) {
   return async (req: Request, ctx: C) => {
     try {
       const user = await getSessionUser();
       if (!user) return json({ error: "Sign in to continue" }, 401);
+      // Signed-out demo guests can take the tour; anything real asks them to sign up.
+      if (user.guest && !opts.guests) return json({ error: "Sign up to try out Fashion Studio!", code: "SIGNUP_REQUIRED" }, 403);
       return await handler(req, user, ctx);
     } catch (e) {
       if (e instanceof HttpError) return json({ error: e.message }, e.status);

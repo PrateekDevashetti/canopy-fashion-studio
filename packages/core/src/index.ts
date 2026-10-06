@@ -2,6 +2,7 @@ export * from "./data";
 export * from "./service";
 export * from "./storage";
 export * from "./ids";
+export * from "./tour";
 export * from "./tools/registry";
 export { db, closeDb } from "./db/client";
 export * as schema from "./db/schema";

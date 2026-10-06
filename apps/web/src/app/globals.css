@@ -113,6 +113,9 @@ button:disabled {
   .btn-accent {
     @apply inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-accent-ink transition-colors hover:bg-accent-hi disabled:bg-accent-deep disabled:text-[#cfe6d2]/80;
   }
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 text-[12.5px] text-dim transition-colors hover:text-fg;
+  }
   .btn-white {
     @apply inline-flex h-8 items-center justify-center gap-1.5 rounded-[9px] bg-white px-3.5 text-[12.5px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-40;
   }

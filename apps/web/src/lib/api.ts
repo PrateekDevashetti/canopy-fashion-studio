@@ -16,6 +16,8 @@ export type AssetDTO = {
   name: string;
   hasSegments: boolean;
   shared: boolean;
+  marked: boolean;
+  saved: boolean;
   createdAt: string;
 };
 
@@ -43,7 +45,7 @@ export type RunDTO = {
 
 export type ProjectDTO = { id: string; name: string; ownerId: string; studio: string; createdAt: string; updatedAt: string; lastOpenedAt: string; cover?: string | null; shared?: boolean };
 export type Role = "owner" | "editor" | "viewer";
-export type Me = { id: string; email: string; name: string; imageUrl: string | null; credits: number; onboarded: boolean; disabledModels: string[] };
+export type Me = { id: string; email: string; name: string; imageUrl: string | null; credits: number; onboarded: boolean; disabledModels: string[]; guest?: boolean };
 export type SegmentDTO = { id: string; label: string; box: [number, number, number, number]; maskKey: string; maskUrl: string; area: number };
 
 export class ApiError extends Error {
@@ -66,6 +68,10 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const data = text ? (() => { try { return JSON.parse(text); } catch { return null; } })() : null;
   if (!res.ok) {
     if (res.status === 401 && typeof window !== "undefined") window.location.href = `/sign-in?redirect_url=${encodeURIComponent(window.location.pathname)}`;
+    if (res.status === 403 && data?.code === "SIGNUP_REQUIRED" && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("fs:signup"));
+      throw new ApiError(403, "");
+    }
     throw new ApiError(res.status, data?.error ?? `Request failed (${res.status})`);
   }
   return data as T;
@@ -111,6 +117,7 @@ export const api = {
   detect: (id: string, refresh = false) => post<{ segments: SegmentDTO[] }>(`/api/assets/${id}/detect${refresh ? "?refresh=1" : ""}`),
   share: (id: string) => post<{ url: string }>(`/api/assets/${id}/share`),
   unshare: (id: string) => call<{ ok: true }>(`/api/assets/${id}/share`, { method: "DELETE" }),
+  tourStepCall: (id: string, step: string, parentId?: string) => post<{ runs: RunDTO[] }>(`/api/projects/${id}/tour`, { step, parentId }),
   members: (id: string) => call<{ role: Role; owner: { name: string; email: string }; members: { email: string; role: "editor" | "viewer"; joined: boolean }[] }>(`/api/projects/${id}/members`),
   invite: (id: string, email: string, role: "editor" | "viewer") => post<{ members: { email: string; role: string; joined: boolean }[] }>(`/api/projects/${id}/members`, { email, role }),
   removeMember: (id: string, email: string) => call<{ members: { email: string; role: string; joined: boolean }[] }>(`/api/projects/${id}/members?email=${encodeURIComponent(email)}`, { method: "DELETE" }),

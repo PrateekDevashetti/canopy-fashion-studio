@@ -32,15 +32,22 @@ export const GET = route<Ctx>(async (_req, user, { params }) => {
         }
       : null,
   });
-});
+}, { guests: true });
 
 export const PATCH = route<Ctx>(async (req, user, { params }) => {
   const { id } = await params;
   await load(id, user.id, "edit");
-  const b = await body<{ name?: string }>(req);
-  const name = typeof b.name === "string" ? b.name.trim().slice(0, 120) : "";
-  if (!name) throw new HttpError(400, "Name can't be empty");
-  await db().update(schema.assets).set({ name }).where(eq(schema.assets.id, id));
+  const b = await body<{ name?: string; marked?: boolean; saved?: boolean }>(req);
+  const patch: { name?: string; marked?: boolean; saved?: boolean } = {};
+  if (typeof b.name === "string") {
+    const name = b.name.trim().slice(0, 120);
+    if (!name) throw new HttpError(400, "Name can't be empty");
+    patch.name = name;
+  }
+  if (typeof b.marked === "boolean") patch.marked = b.marked;
+  if (typeof b.saved === "boolean") patch.saved = b.saved;
+  if (!Object.keys(patch).length) throw new HttpError(400, "Nothing to update");
+  await db().update(schema.assets).set(patch).where(eq(schema.assets.id, id));
   return json({ asset: serializeAsset((await getAsset(id))!) });
 });
 

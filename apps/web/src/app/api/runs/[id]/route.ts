@@ -14,7 +14,7 @@ export const GET = route<Ctx>(async (_req, user, { params }) => {
   await requireProject(r.projectId, user.id);
   if (r.status === "queued" && Date.now() - r.createdAt.getTime() > 45_000) after(() => kickStale([r.id]));
   return json({ run: await runWithOutputs(id) });
-});
+}, { guests: true });
 
 /** Deleting runs is reserved for the project owner. */
 export const DELETE = route<Ctx>(async (_req, user, { params }) => {

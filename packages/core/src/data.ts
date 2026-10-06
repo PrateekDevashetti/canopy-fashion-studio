@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "./db/client";
-import { assets, creditLedger, projectMembers, projects, runs, users, type AssetRow, type ProjectRow, type RunRow, type UserRow } from "./db/schema";
+import { assets, creditLedger, projectMembers, projects, reviewComments, runs, users, type AssetRow, type ProjectRow, type RunRow, type UserRow } from "./db/schema";
 import { newId } from "./ids";
 import { deleteObject, fileUrl } from "./storage";
 import { runLabel, toolById } from "./tools/registry";
@@ -18,11 +18,13 @@ export class HttpError extends Error {
 
 /* ---------------- users ---------------- */
 
+export const isGuest = (userId: string) => userId.startsWith("guest_");
+
 export async function ensureUser(id: string, profile: { email?: string; name?: string; imageUrl?: string | null }): Promise<UserRow> {
   const d = db();
   const [row] = await d
     .insert(users)
-    .values({ id, email: profile.email ?? "", name: profile.name ?? "", imageUrl: profile.imageUrl ?? null, credits: SIGNUP_CREDITS() })
+    .values({ id, email: profile.email ?? "", name: profile.name ?? "", imageUrl: profile.imageUrl ?? null, credits: isGuest(id) ? 0 : SIGNUP_CREDITS() })
     .onConflictDoNothing()
     .returning();
   if (row) {
@@ -41,6 +43,18 @@ export async function ensureUser(id: string, profile: { email?: string; name?: s
       .where(and(eq(projectMembers.email, profile.email.toLowerCase()), isNull(projectMembers.userId)));
   }
   return (await d.query.users.findFirst({ where: eq(users.id, id) }))!;
+}
+
+/** Move a signed-out demo guest's work into the account they just created. Returns the latest project id. */
+export async function claimGuest(guestId: string, userId: string): Promise<string | null> {
+  if (!isGuest(guestId) || isGuest(userId)) return null;
+  const d = db();
+  const moved = await d.update(projects).set({ ownerId: userId, name: "Fashion Studio tour" }).where(eq(projects.ownerId, guestId)).returning({ id: projects.id });
+  await d.update(runs).set({ userId }).where(eq(runs.userId, guestId));
+  await d.update(assets).set({ userId }).where(eq(assets.userId, guestId));
+  await d.update(users).set({ onboarded: true }).where(eq(users.id, userId));
+  await d.delete(users).where(eq(users.id, guestId));
+  return moved[0]?.id ?? null;
 }
 
 export async function getUser(id: string) {
@@ -79,6 +93,11 @@ export async function refundCredits(userId: string, amount: number, reason: stri
   const d = db();
   await d.update(users).set({ credits: sql`${users.credits} + ${amount}` }).where(eq(users.id, userId));
   await d.insert(creditLedger).values({ id: newId("led"), userId, delta: amount, reason, runId });
+}
+
+export async function ledger(userId: string, limit = 30) {
+  const rows = await db().select().from(creditLedger).where(eq(creditLedger.userId, userId)).orderBy(desc(creditLedger.createdAt)).limit(limit);
+  return rows.map((r) => ({ id: r.id, delta: r.delta, reason: r.reason, runId: r.runId, createdAt: r.createdAt.toISOString() }));
 }
 
 /* ---------------- projects & access ---------------- */
@@ -208,6 +227,8 @@ export function serializeAsset(a: AssetRow) {
     name: a.name,
     hasSegments: Boolean(a.segments?.length),
     shared: Boolean(a.shareToken),
+    marked: a.marked,
+    saved: a.saved,
     createdAt: a.createdAt.toISOString(),
   };
 }
@@ -220,6 +241,25 @@ export async function getAsset(id: string) {
 export async function insertAsset(v: typeof assets.$inferInsert) {
   const [row] = await db().insert(assets).values(v).returning();
   return row;
+}
+
+export async function assetByShareToken(token: string) {
+  if (!/^[A-Za-z0-9]{22}$/.test(token)) return null;
+  return db().query.assets.findFirst({ where: and(eq(assets.shareToken, token), isNull(assets.deletedAt)) });
+}
+
+export async function reviewThread(assetId: string) {
+  const rows = await db().select().from(reviewComments).where(eq(reviewComments.assetId, assetId)).orderBy(asc(reviewComments.createdAt)).limit(200);
+  return rows.map((r) => ({ id: r.id, author: r.author, body: r.body, verdict: r.verdict, createdAt: r.createdAt.toISOString() }));
+}
+
+export async function addReview(assetId: string, author: string, body: string, verdict: "approve" | "changes" | null) {
+  const a = author.trim().slice(0, 60) || "Reviewer";
+  const b = body.trim().slice(0, 2000);
+  if (!b && !verdict) throw new HttpError(400, "Write a comment or choose a verdict");
+  const count = await db().select({ id: reviewComments.id }).from(reviewComments).where(eq(reviewComments.assetId, assetId));
+  if (count.length >= 200) throw new HttpError(429, "This review thread is full");
+  await db().insert(reviewComments).values({ id: newId("shr").replace("shr_", "rev_"), assetId, author: a, body: b, verdict });
 }
 
 export async function deleteAsset(id: string) {

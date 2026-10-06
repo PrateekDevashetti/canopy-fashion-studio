@@ -9,7 +9,7 @@ export const GET = route<Ctx>(async (_req, user, { params }) => {
   const { project, role } = await requireProject(id, user.id);
   await touchProject(id);
   return json({ project: serializeProject(project), role });
-});
+}, { guests: true });
 
 export const PATCH = route<Ctx>(async (req, user, { params }) => {
   const { id } = await params;

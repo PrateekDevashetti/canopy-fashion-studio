@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { useMemo } from "react";
 import { bindsActive, toolById, type Tool } from "@fashion/core/tools";
 import { api, ApiError, type AssetDTO, type Me, type ProjectDTO, type Role, type RunDTO, type SegmentDTO } from "./api";
 
@@ -17,6 +18,19 @@ export type Selection =
   | { kind: "segment"; segment: SegmentDTO };
 
 export type Toast = { id: number; text: string; tone?: "error" | "ok" };
+
+/** Annotation items in natural image pixels. */
+export type AnnItem =
+  | { id: string; kind: "path"; points: [number, number][]; color: string; width: number }
+  | { id: string; kind: "rect" | "ellipse" | "arrow"; from: [number, number]; to: [number, number]; color: string; width: number }
+  | { id: string; kind: "text"; at: [number, number]; text: string; color: string; size: number };
+
+export type ShapeKind = "rect" | "ellipse" | "arrow";
+export const ANN_COLORS = ["#ffffff", "#111111", "#5bc466", "#e5484d", "#f2b84b"];
+
+export type Crop = { cx: number; cy: number; w: number; h: number; rot: number; lock: boolean };
+export type Adjust = { warmth: number; contrast: number; saturation: number; brightness: number; highlights: number; shadows: number; tint: number; hue: number };
+export const ADJUST_DEFAULT: Adjust = { warmth: 0, contrast: 1, saturation: 1, brightness: 0, highlights: 0, shadows: 0, tint: 0, hue: 0 };
 
 type ToolState = { inputs: Record<string, unknown>; resolution?: string; aspect?: string; touched: Record<string, boolean> };
 
@@ -44,6 +58,12 @@ type State = {
   toasts: Toast[];
   welcome: "hidden" | "intro" | "tour";
   tourStep: number;
+  board: "single" | "grid";
+  ann: { color: string; stroke: number; textSize: number; shape: ShapeKind; items: AnnItem[]; editing: string | null };
+  brush: { size: number; erase: boolean };
+  crop: Crop;
+  adjust: Adjust;
+  busy: string | null;
 
   // derived helpers
   assets: () => AssetDTO[];
@@ -92,6 +112,12 @@ export const useStudio = create<State>((set, get) => ({
   toasts: [],
   welcome: "hidden",
   tourStep: 0,
+  board: "single",
+  ann: { color: "#e5484d", stroke: 6, textSize: 32, shape: "rect", items: [], editing: null },
+  brush: { size: 50, erase: false },
+  crop: { cx: 0.5, cy: 0.5, w: 1, h: 1, rot: 0, lock: false },
+  adjust: { ...ADJUST_DEFAULT },
+  busy: null,
 
   assets: () => {
     const out: AssetDTO[] = [];
@@ -139,14 +165,14 @@ export const useStudio = create<State>((set, get) => ({
         const before = prev.get(r.id);
         if (before && (before.status === "queued" || before.status === "running")) {
           if (r.status === "failed") get().toast(r.error ?? `${r.toolName} failed`, "error");
-          else if (r.status === "succeeded" && r.outputs[0] && get().view === "editor") set({ activeId: r.outputs[0].id, selection: null });
+          else if (r.status === "succeeded" && r.outputs[0] && (get().activeId === `pending:${r.id}` || !get().activeId)) set({ activeId: r.outputs[0].id, selection: null });
           if (r.status === "succeeded" && r.error) get().toast(r.error, "error");
         }
       }
       const optimistic = get().runs.filter((r) => r.optimistic && !runs.some((x) => x.id === r.id));
       set({ runs: [...optimistic, ...runs], me });
       const active = get().activeId;
-      if (active && !get().asset(active)) set({ activeId: runs.find((r) => r.outputs.length)?.outputs[0]?.id ?? null });
+      if (active && !active.startsWith("pending:") && !get().asset(active)) set({ activeId: runs.find((r) => r.outputs.length)?.outputs[0]?.id ?? null });
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) get().toast("This project is no longer available", "error");
     }
@@ -157,7 +183,7 @@ export const useStudio = create<State>((set, get) => ({
     set({ activeId: id, selection: null, hoverSegment: null, mode: ["crop", "adjust", "draw", "text", "shapes"].includes(get().mode) ? "select" : get().mode });
     // Re-bind tool inputs that follow the open image, unless the user picked something by hand.
     const toolId = get().toolId;
-    if (toolId) bindActiveInputs(toolId);
+    if (toolId && !id?.startsWith("pending:")) bindActiveInputs(toolId);
   },
 
   openTool: (id) => {
@@ -186,6 +212,10 @@ export const useStudio = create<State>((set, get) => ({
     if (["draw", "text", "shapes"].includes(m)) patch.lastAnnotateMode = m as AnnotateMode;
     if (m !== s.mode && !(["lasso", "brush", "auto", "square"].includes(m) && s.selection?.kind === "segment" && m === "auto")) patch.selection = null;
     if (m === "crop" || m === "adjust") patch.toolId = null;
+    if (m === "crop" && s.mode !== "crop") patch.crop = { cx: 0.5, cy: 0.5, w: 1, h: 1, rot: 0, lock: false };
+    if (m === "adjust" && s.mode !== "adjust") patch.adjust = { ...ADJUST_DEFAULT };
+    const annot = (x: Mode) => x === "draw" || x === "text" || x === "shapes";
+    if (annot(s.mode) && !annot(m)) patch.ann = { ...s.ann, items: [], editing: null };
     set(patch);
     if (m === "auto" && s.activeId) void get().loadSegments(s.activeId);
   },
@@ -226,7 +256,7 @@ export const useStudio = create<State>((set, get) => ({
 function bindActiveInputs(toolId: string) {
   const s = useStudio.getState();
   const tool: Tool | undefined = toolById(toolId);
-  const active = s.activeId;
+  const active = s.activeId?.startsWith("pending:") ? null : s.activeId;
   if (!tool) return;
   const t = s.tools[toolId] ?? { inputs: {}, touched: {} };
   const inputs = { ...t.inputs };
@@ -245,3 +275,9 @@ function bindActiveInputs(toolId: string) {
 }
 
 export const isPending = (r: RunDTO) => r.status === "queued" || r.status === "running";
+
+/** All assets across runs, memoized on the runs array (selectors must not return fresh arrays). */
+export function useAssets(): AssetDTO[] {
+  const runs = useStudio((s) => s.runs);
+  return useMemo(() => runs.flatMap((r) => r.outputs), [runs]);
+}
