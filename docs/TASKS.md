@@ -1,74 +1,72 @@
 # Fashion Studio — task list
 
 Loop for every task: **build → typecheck → test (unit/flow) → screenshot vs reference → fix → tick**.
-Status: `[x]` done & verified · `[~]` in progress · `[ ]` todo.
+Status: `[x]` done & verified · `[~]` built, needs re-verification · `[ ]` todo · `[!]` blocked on a human.
+
+Verification sources: unit tests (`npm test`, 16 tests), e2e suite `tests/e2e` (29/29 green at `e2793cc`),
+real-model scripts in `qa/`.
 
 ## M0 Foundations
 - [x] Repo, npm workspaces, worktree `feat/studio`, remote `PrateekDevashetti/canopy-fashion-studio`
 - [x] Keys from floraxfauna into `.env.local` (FAL, OpenRouter, Gemini, R2 `canopy-assets` + prefix `fashion-studio/`, Clerk dev instance shared with the canvas)
-- [x] Provider probes: NB2 + NB2 edit, BiRefNet, SAM 3, Veo 3.1 / Kling 2.5 schemas, OpenRouter Gemini 3.6 Flash detection
+- [x] Provider probes: NB2 + NB2 edit, BiRefNet, SAM 3, Veo 3.1 / Kling schemas, OpenRouter Gemini 3.6 Flash detection
 - [x] Core: schema, db client, storage (R2 SigV4 + local), ids
-- [x] Core: tool registry (15 tools + 5 soon), pricing, validation, active-image binding — unit tests
+- [x] Core: tool registry (15 tools + 5 soon, per the screenshots), pricing, validation, active-image binding — unit tests
 - [x] Core: data/ACL/credits ledger, service (createRun, uploads, edits, masks)
-- [x] Engine: providers w/ retries, imaging (mask composite, highlight, crop), prompts, run executor w/ partial refunds, video resume, stale recovery
-- [x] Engine: garment detection (Gemini boxes → SAM masks → box fallback)
+- [x] Engine: providers w/ retries + cross-provider fallback, imaging, prompts, run executor w/ partial refunds, video resume, stale recovery
+- [x] Engine: garment detection (Gemini boxes → SAM masks → Gemini mask → box fallback)
 - [x] Worker (Railway) loop + health + Dockerfile
-- [x] API routes: health, me, projects, feed, uploads, runs, edits, masks, members, runs/:id, assets/:id, detect, share, files, cron
-- [ ] Schema additions: assets.marked, assets.saved, review comments table
-- [ ] CLAUDE.md (kept current)
+- [x] API routes
+- [x] Schema additions: assets.marked, assets.saved, review comments table
+- [x] CLAUDE.md (kept current)
 
-## M1 Studio shell
-- [ ] Layout + top bar (logo, project menu, privacy line, toolbar, Editor/Feed toggle, zoom ▾)
-- [ ] Tool rail (sections, icons, labels, selected/new states, hover preview cards, Soon tools, Library, Upload)
-- [ ] Settings panel (all input kinds, Applying to, mask picker, examples, colors, resolution/aspect, model-blocked warning, cost, Generate, generating count)
-- [ ] Filmstrip (run groups, labels, time-ago, selection, pin)
-- [ ] Empty state (collage + Sketch/Image tiles + prompt box)
-- [ ] Polling + optimistic placeholders + toasts + keyboard shortcuts (V L B A S E F, ⌘Z? Esc, Delete)
+## M1 Studio shell — verified by e2e t02
+- [x] Layout + top bar, tool rail (hover previews, Soon tools, Library, Upload), settings panel, filmstrip, empty state
+- [x] Polling + optimistic placeholders + toasts + keyboard shortcuts
 
-## M2 Canvas editor
-- [ ] Image stage: fit, zoom %, ctrl/⌘+wheel zoom, pan (space / middle drag), video playback
-- [ ] Lasso, Brush (+size, eraser), Square (Shift 1:1), Auto detect (overlay, hover, click) → mask upload
-- [ ] "Make a change…" bubble (drag) → region edit run; selection bar (re-detect, delete, close)
-- [ ] Draw / Text / Shapes (colors, stroke/size, rect/ellipse/arrow, Save → new version)
-- [ ] Crop (overlay, center/size, lock ratio, rotation, Save)
-- [ ] Adjustments (8 sliders w/ gradient tracks, live preview, Save)
-- [ ] Remove background, Open in Canvas, Download, Share dialog
+## M2 Canvas editor — verified by e2e t04 (before the server-side edit change)
+- [x] Image stage: fit, zoom, pan, video playback
+- [x] Lasso, Brush, Square, Auto detect → mask upload; "Make a change…" region edit
+- [~] Draw / Text / Shapes save — now composited server-side from a transparent overlay; re-run t04
+- [~] Crop save — now rendered server-side from the master (unit-tested exact pixels); re-run t04
+- [~] Adjustments save — shared `@fashion/core/adjust` code, server-side; re-run t04
+- [x] Remove background, Open in Canvas, Download, Share dialog
 
-## M3 Feed
-- [ ] Breadcrumb project switcher (search, rename, new)
-- [ ] Runs grid / ticker, size slider, generating placeholders, failed runs
-- [ ] Hover actions (download, fullscreen, ⋮ info/canvas/delete), lightbox
-- [ ] Multi-select (shift/cmd) + selection panel (Mark, Open in Canvas, Share assets, Share for review, Download, Save to Assets, Export, Delete)
-- [ ] Run header actions (download zip, delete), "Make something new"
-- [ ] Details panel
+## M3 Feed — verified by e2e t06
+- [x] Project switcher, grid/ticker + size, placeholders, failed runs, hover actions, lightbox
+- [x] Multi-select + selection panel, run header actions, details panel
+- [~] Zip/batch downloads now fetch originals in ≤4 MB ranges; re-run t06
 
-## M4 Projects, team, settings
-- [ ] `/studio` → latest project; `/studios` dashboard (Studio card ⋯, project grid, Studio badge)
-- [ ] Members dialog (invite by email, roles, owner-only delete)
-- [ ] `/settings` (model access, credits ledger, account)
-- [ ] `/s/[token]` share page + review comments
-- [ ] Open in Canvas via canopy-api `POST /api/projects/import` (fallback: download + open app.trycanopy.space)
+## M4 Projects, team, settings — verified by e2e t02/t06
+- [x] `/studio` → latest project; `/studios` dashboard; members; `/settings`; `/s/[token]` + reviews; Open in Canvas
 
-## M5 Onboarding
-- [ ] Welcome modal (Get started / Skip / ✕)
-- [ ] Guided tour w/ spotlight + step cards + demo clips (sketch → render → select → recolor → try-on → feed → export) using pre-baked tour assets
-- [ ] Signed-out demo `/studio/demo` + "Sign up to try out Fashion Studio!" gate
-- [ ] Help menu (shortcuts, restart tour)
+## M5 Onboarding — verified by e2e t03
+- [x] Welcome modal, guided tour with pre-baked assets, signed-out demo + sign-up gate, help menu
 
-## M6 Assets
-- [ ] Generate tool icons (15) + preview cards (15) + empty-state collage + tour assets + landing imagery via fal (original, Canopy-owned)
-
-## M7 Landing
-- [ ] Nav w/ dropdowns, hero video, built-for row, workflow strip, value props, 3 card sections, tool list, FAQ accordion, CTA, footer
+## M6 Assets / M7 Landing — verified by e2e t01
+- [x] Tool icons, preview cards, collage, tour assets, landing imagery (original, Canopy-owned)
+- [x] Landing page
 
 ## M8 QA loop
-- [ ] `qa/flow.mts` Playwright end-to-end (all tools on real models, edits, feed actions)
-- [ ] `qa/capture.mts` + `qa/compare.py` screenshot parity vs `qa/ref/*`
-- [ ] Fix until parity ≥ target; code review pass
+- [x] `tests/e2e` end-to-end suite (real models, edits, feed actions, hardening)
+- [x] `qa/consistency.mts`, `qa/color-match.mts`, `qa/identity.mts` real-model consistency checks
+- [~] Re-run full e2e after migration 0002 is applied locally
+
+## M10 Production hardening (CTO review — docs/CTO-REVIEW.md)
+- [x] Uploads stored byte-for-byte (sha256 recorded); results stored exactly as generated; WebP previews
+- [x] Chunked uploads + windowed file serving + presigned redirects (Vercel 4.5 MB body limit)
+- [x] Server-side crop/adjust/annotate from the full-res master
+- [x] Fix mask channel bug that misplaced feathered composites
+- [x] Pad-to-aspect in-place edits, drift check + retry, auto garment mask, Lab color-accuracy pass
+- [x] Identity references (face/outfit close-ups) + identity-lock prompts
+- [x] Rate limits, Origin check, security headers, security event logs, health golden signals, SLO doc
+- [!] Apply `packages/core/migrations/0002_asset_previews_meta.sql` locally (`npm run db:push`) — needs approval
 
 ## M9 Ship
-- [ ] Push to GitHub
-- [ ] Neon project + schema push
-- [ ] Vercel project + env + deploy (preview → verify → promote)
-- [ ] Railway worker + env + deploy, health green
+- [x] Push to GitHub
+- [x] Production `next build` passes
+- [!] Neon project — accept Neon Marketplace terms in the browser, then `bash scripts/ship.sh`
+- [~] Vercel project created; env + deploy run by `scripts/ship.sh`
+- [~] Railway worker project created; env + deploy run by `scripts/ship.sh`
+- [!] fal account locked (`TOP_UP`) — image tools fall back to OpenRouter; video tools need fal
 - [ ] Prod smoke test; domain `fashion.trycanopy.space` (DNS by user)

@@ -22,6 +22,27 @@ shoot → review). Spec: `docs/PRD.md`. Work queue: `docs/TASKS.md` — **tick t
   `fal-ai/kling-video/v2.5-turbo/pro/image-to-video` (tail image). fal accepts data URIs as image inputs.
 - Vision: OpenRouter `google/gemini-3.6-flash` (returns garment labels + box_2d 0–1000).
 - The Gemini direct key is **free tier: image quota 0** — don't use it for generation.
+- 2026-10-06: fal account **locked (TOP_UP)** — image tools fall back to OpenRouter (Gemini 3 Pro / 3.1 Flash Image);
+  video (Veo/Kling) and FASHN try-on need fal topped up.
+
+## Assets (don't regress these)
+- **Masters are exact**: uploads stored byte-for-byte (`media.ts` `storeImage`, sha256 in `assets.meta`); results stored
+  exactly as generated. Never re-encode a master. Display uses `previewKey` (WebP ≤2560px) → DTO `url`; downloads and
+  hand-offs use `originalUrl`.
+- **Vercel 4.5 MB body limit** (request + response): uploads >4 MB go in chunks (`uploadChunk`/`completeUpload`);
+  `/api/files` serves ≤4 MB windows and 302s big whole-file requests to presigned R2 (`presignGet`). R2 token is
+  object-scoped — no bucket CORS, so browsers can't read R2 pixels cross-origin; keep pixel work same-origin or server-side.
+- Editor saves (crop/adjust/annotate) render server-side from the master (`edit.ts`); adjust math lives in
+  `@fashion/core/adjust` and is shared with the live preview.
+- Consistency engine (`engine/run.ts` `inPlaceEdit`): pad-to-aspect → model → unpad → drift check/retry → masked composite.
+  Recolor adds a Lab colour-accuracy pass (`matchGarmentColor`). Photo Shoot / Multi-Angle add face + outfit close-ups.
+- Masks must stay single-channel raw in `maskAlpha` (an encode round-trip turns them 3-channel and misplaces composites).
+
+## Ops
+- Schema changes: edit `schema.ts` **and** add an idempotent SQL file in `packages/core/migrations/`.
+- Rate limits (`ratelimit.ts`) via `route(handler, { limit })`; security events are JSON log lines `level: "security"`.
+- SLOs, alerts, runbooks: `docs/SLO.md`. CTO review + roadmap: `docs/CTO-REVIEW.md`.
+- Core tests run with `tsx --test` (extensionless imports).
 
 ## Rules
 - Match the reference screenshots (FLORA Fashion Studio) for layout/behavior; brand is Canopy (mark `public/brand/canopy-mark.svg`,
