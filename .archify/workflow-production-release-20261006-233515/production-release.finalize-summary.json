@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "workflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "/Users/prateekdevashetti/canopy-fashion-studio/.claude/worktrees/build/.archify/workflow-production-release-20261006-233515/candidate.json",
+    "sha256": "9099218cb8cc39dd9a221cd39a6007f254ac224e42da37cf80171cbf0829f753",
+    "bytes": 5531
+  },
+  "artifact": {
+    "path": "/Users/prateekdevashetti/canopy-fashion-studio/.claude/worktrees/build/.archify/workflow-production-release-20261006-233515/production-release.html",
+    "sha256": "f5a33c60ac2c7c4a34fc9ef969e909882e256c1d5a5069de45fae6a333d13c76",
+    "bytes": 761993
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "skipped"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/Users/prateekdevashetti/canopy-fashion-studio/.claude/worktrees/build/.archify/workflow-production-release-20261006-233515/production-release.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome or Chromium executable and rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/Users/prateekdevashetti/canopy-fashion-studio/.claude/worktrees/build/.archify/workflow-production-release-20261006-233515/production-release.finalize.json",
+    "summaryReceipt": "/Users/prateekdevashetti/canopy-fashion-studio/.claude/worktrees/build/.archify/workflow-production-release-20261006-233515/production-release.finalize-summary.json",
+    "browserCheckReceipt": "/Users/prateekdevashetti/canopy-fashion-studio/.claude/worktrees/build/.archify/workflow-production-release-20261006-233515/production-release.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.0.1",
+    "availableVersion": "3.0.1",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-06T07:30:39.385Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 586
+}
