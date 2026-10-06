@@ -1,0 +1,55 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Canopy Fashion Studio Production Release",
+    "subtitle": "Verified release path: GitHub revision, Neon schema, Vercel web, Railway worker, then health checks",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-production-release-20261006-233515/production-release.html",
+    "repository": {
+      "url": "git@github.com:PrateekDevashetti/canopy-fashion-studio.git",
+      "link_mode": "local-only",
+      "revision": "656933a864dede2b71564b779eb516ad691f3751"
+    }
+  },
+  "lanes": [
+    { "id": "delivery", "label": "Source and Release" },
+    { "id": "services", "label": "Production Services" },
+    { "id": "evidence", "label": "Verification" }
+  ],
+  "phases": [
+    { "id": "prepare", "label": "Prepare", "fromCol": 0, "toCol": 1 },
+    { "id": "release_phase", "label": "Release", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "verify", "label": "Verify", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "groups": [
+    { "id": "secret_handling", "label": "Secrets stay local or platform-managed", "lane": "delivery", "fromCol": 1, "toCol": 3, "variant": "security" },
+    { "id": "worker_runtime", "label": "Asynchronous generation", "lane": "services", "fromCol": 3, "toCol": 5, "variant": "emphasis" },
+    { "id": "health_evidence", "label": "Runtime evidence", "lane": "evidence", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["revision", "ship_script", "neon", "vercel", "web_health"],
+  "nodes": [
+    { "id": "revision", "lane": "delivery", "col": 0, "type": "external", "label": "GitHub revision", "sublabel": "pushed before release", "width": 126, "sources": [{ "path": "scripts/ship.sh", "line": 2, "end_line": 5, "label": "release script" }] },
+    { "id": "ship_script", "lane": "delivery", "col": 1, "type": "backend", "label": "scripts/ship.sh", "sublabel": "local secrets stay private", "width": 132, "sources": [{ "path": "scripts/ship.sh", "line": 1, "end_line": 14, "label": "setup entry" }] },
+    { "id": "neon", "lane": "services", "col": 2, "type": "database", "label": "Neon Postgres", "sublabel": "production schema", "width": 132, "sources": [{ "path": "scripts/ship.sh", "line": 16, "end_line": 28, "label": "schema push" }, { "path": "packages/core/migrations/0003_boards_explore_folders.sql", "line": 1, "end_line": 36, "label": "idempotent migration" }] },
+    { "id": "platform_env", "lane": "delivery", "col": 2, "type": "security", "label": "Platform environment", "sublabel": "production variables", "width": 132, "sources": [{ "path": "scripts/ship.sh", "line": 30, "end_line": 60, "label": "environment configuration" }] },
+    { "id": "vercel", "lane": "services", "col": 3, "type": "cloud", "label": "Vercel web app", "sublabel": "Next.js web and API", "width": 132, "sources": [{ "path": "apps/web/vercel.json", "line": 1, "end_line": 10, "label": "Vercel configuration" }, { "path": "scripts/ship.sh", "line": 63, "end_line": 65, "label": "web deploy" }] },
+    { "id": "railway", "lane": "services", "col": 4, "type": "cloud", "label": "Railway worker", "sublabel": "executes queued runs", "width": 132, "sources": [{ "path": "Dockerfile", "line": 1, "end_line": 17, "label": "worker container" }, { "path": "apps/worker/src/main.ts", "line": 16, "end_line": 42, "label": "run processing" }, { "path": "scripts/ship.sh", "line": 47, "end_line": 65, "label": "worker deploy" }] },
+    { "id": "web_health", "lane": "evidence", "col": 4, "type": "backend", "label": "Web health check", "sublabel": "database, queue, providers", "width": 132, "sources": [{ "path": "apps/web/src/app/api/health/route.ts", "line": 11, "end_line": 37, "label": "health response" }, { "path": "scripts/ship.sh", "line": 67, "end_line": 70, "label": "release health gate" }] },
+    { "id": "worker_health", "lane": "evidence", "col": 5, "type": "backend", "label": "Worker health check", "sublabel": "loop freshness", "width": 132, "sources": [{ "path": "apps/worker/src/main.ts", "line": 52, "end_line": 61, "label": "worker health" }] }
+  ],
+  "edges": [
+    { "id": "revision-to-script", "from": "revision", "to": "ship_script", "label": "release candidate", "role": "main", "variant": "emphasis" },
+    { "id": "script-to-neon", "from": "ship_script", "to": "neon", "label": "apply schema", "role": "main", "variant": "emphasis" },
+    { "id": "script-to-env", "from": "ship_script", "to": "platform_env", "label": "set secrets", "role": "branch", "variant": "security" },
+    { "id": "neon-to-vercel", "from": "neon", "to": "vercel", "label": "database URL", "role": "main", "variant": "default" },
+    { "id": "env-to-railway", "from": "platform_env", "to": "railway", "label": "worker config", "role": "branch", "variant": "security" },
+    { "id": "vercel-to-health", "from": "vercel", "to": "web_health", "label": "GET /api/health", "role": "main", "variant": "emphasis" },
+    { "id": "railway-to-worker-health", "from": "railway", "to": "worker_health", "label": "GET /health", "role": "main", "variant": "emphasis" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Completed database change", "items": ["Migration 0003 is additive and idempotent", "The production run completed before this release workflow"] },
+    { "dot": "amber", "title": "Release boundary", "items": ["Git synchronization is not deployment proof", "The authenticated E2E suite must have valid test credentials before it can be a release gate"] }
+  ]
+}
