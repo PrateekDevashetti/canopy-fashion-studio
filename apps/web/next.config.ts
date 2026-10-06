@@ -7,7 +7,8 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../.."),
   images: { unoptimized: true },
   devIndicators: false,
-  experimental: { serverActions: { bodySizeLimit: "30mb" } },
+  // No persistent Turbopack dev cache: this machine has very little free disk.
+  experimental: { serverActions: { bodySizeLimit: "30mb" }, turbopackFileSystemCacheForDev: false },
   async headers() {
     return [
       {
