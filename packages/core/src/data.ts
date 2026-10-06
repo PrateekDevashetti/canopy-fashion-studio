@@ -135,12 +135,12 @@ export async function listProjects(userId: string, q?: string) {
   // Cover image: newest image asset per project.
   const covers = filtered.length
     ? await d
-        .selectDistinctOn([assets.projectId], { projectId: assets.projectId, key: assets.storageKey, poster: assets.posterKey, media: assets.media })
+        .selectDistinctOn([assets.projectId], { projectId: assets.projectId, key: assets.storageKey, preview: assets.previewKey, poster: assets.posterKey, media: assets.media })
         .from(assets)
         .where(and(inArray(assets.projectId, filtered.map((p) => p.id)), isNull(assets.deletedAt), inArray(assets.kind, ["upload", "result"])))
         .orderBy(assets.projectId, desc(assets.createdAt))
     : [];
-  const coverBy = new Map(covers.map((c) => [c.projectId, fileUrl(c.media === "video" ? c.poster ?? c.key : c.key)]));
+  const coverBy = new Map(covers.map((c) => [c.projectId, fileUrl(c.media === "video" ? c.poster ?? c.key : c.preview ?? c.key)]));
   return filtered.map((p) => ({ ...serializeProject(p), cover: coverBy.get(p.id) ?? null, shared: p.ownerId !== userId }));
 }
 
@@ -218,8 +218,13 @@ export function serializeAsset(a: AssetRow) {
     parentId: a.parentId,
     kind: a.kind,
     media: a.media,
-    url: fileUrl(a.storageKey)!,
+    /** Display URL: the light preview when there is one, else the master. */
+    url: fileUrl(a.previewKey ?? a.storageKey)!,
+    /** The master file — exactly what was uploaded or generated. Use for downloads and hand-offs. */
+    originalUrl: fileUrl(a.storageKey)!,
     poster: fileUrl(a.posterKey),
+    sha256: a.meta?.sha256 ?? null,
+    fidelity: a.meta?.fidelity ?? null,
     mime: a.mime,
     width: a.width,
     height: a.height,
@@ -345,6 +350,8 @@ export async function purgeDeleted(limit = 100) {
     .limit(limit);
   for (const a of old) {
     await deleteObject(a.storageKey);
+    if (a.previewKey) await deleteObject(a.previewKey);
+    if (a.posterKey?.includes("/previews/")) await deleteObject(a.posterKey);
     await d.delete(assets).where(eq(assets.id, a.id));
   }
   return old.length;

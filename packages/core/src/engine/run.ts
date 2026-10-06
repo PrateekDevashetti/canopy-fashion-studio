@@ -1,6 +1,7 @@
 import { and, eq, lt, sql, inArray } from "drizzle-orm";
 import { db } from "../db/client";
-import { assets, runs, type RunRow } from "../db/schema";
+import { assets, runs, type AssetMeta, type RunRow } from "../db/schema";
+import { sha256, storeImage } from "../media";
 import { getAsset, insertAsset, refundCredits } from "../data";
 import { newId } from "../ids";
 import { extFor, getObjectBuffer, putObject } from "../storage";
@@ -11,7 +12,7 @@ import { ANGLES, P, SHOOT_SHOTS } from "./prompts";
 import sharp from "sharp";
 
 type Settings = { resolution?: string; aspect?: string };
-type Output = { buf: Buffer; mime: string; name: string; posterKey?: string | null; parentId?: string | null };
+type Output = { buf: Buffer; mime: string; name: string; posterKey?: string | null; parentId?: string | null; meta?: AssetMeta };
 type Ctx = { run: RunRow; settings: Settings; emit: (o: Output) => Promise<void> };
 
 const NB2 = "fal-ai/nano-banana-2";
@@ -336,25 +337,26 @@ async function execute(ctx: Ctx) {
 
 async function store(run: RunRow, o: Output) {
   const id = newId("ast");
-  let buf = o.buf;
-  let mime = o.mime;
+  const base = { id, projectId: run.projectId, userId: run.userId, runId: run.id, parentId: o.parentId ?? null, kind: "result" as const, name: o.name };
+  if (o.mime.startsWith("image/")) {
+    // The master is kept exactly as the model/compositor produced it; the feed shows a preview.
+    const stored = await storeImage(run.projectId, id, o.buf);
+    await insertAsset({ ...base, media: "image", ...stored, meta: { ...stored.meta, ...o.meta } });
+    return;
+  }
+  // Video: own poster frame (so deleting the source image never breaks it).
   let width = 0;
   let height = 0;
-  if (mime.startsWith("image/")) {
-    const meta = await sharp(buf).metadata();
-    // Opaque results ship as JPEG (5–10× smaller); cutouts keep their alpha.
-    if (!meta.hasAlpha) {
-      buf = await sharp(buf).jpeg({ quality: 93, mozjpeg: true }).toBuffer();
-      mime = "image/jpeg";
-    }
-    ({ width, height } = await dims(buf));
-  } else if (o.posterKey) {
-    const poster = await getObjectBuffer(o.posterKey);
-    if (poster) ({ width, height } = await dims(poster));
+  let posterKey: string | null = null;
+  const source = o.posterKey ? await getObjectBuffer(o.posterKey) : null;
+  if (source) {
+    ({ width, height } = await dims(source));
+    posterKey = `p/${run.projectId}/previews/${id}.webp`;
+    await putObject(posterKey, await sharp(source).rotate().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).webp({ quality: 86 }).toBuffer());
   }
-  const key = `p/${run.projectId}/${id}.${extFor(mime)}`;
-  await putObject(key, buf);
-  await insertAsset({ id, projectId: run.projectId, userId: run.userId, runId: run.id, parentId: o.parentId ?? null, kind: "result", media: mime.startsWith("video/") ? "video" : "image", storageKey: key, posterKey: o.posterKey ?? null, mime, width, height, bytes: buf.length, name: o.name });
+  const storageKey = `p/${run.projectId}/${id}.${extFor(o.mime)}`;
+  await putObject(storageKey, o.buf);
+  await insertAsset({ ...base, media: "video", storageKey, posterKey, mime: o.mime, width, height, bytes: o.buf.length, meta: { sha256: sha256(o.buf), ...o.meta } });
 }
 
 /** Atomically move a queued run to running. Returns null if someone else took it. */

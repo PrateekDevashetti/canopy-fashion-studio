@@ -113,6 +113,75 @@ export async function getObject(key: string, range?: string | null): Promise<{ b
   }
 }
 
+/**
+ * Presigned GET (SigV4 query auth) so browsers can fetch large objects straight from R2 —
+ * Vercel functions can't return bodies over 4.5 MB. Returns null in local-disk mode.
+ */
+export function presignGet(key: string, expiresSec = 3600, downloadName?: string | null): string | null {
+  const c = s3();
+  if (!c) return null;
+  const objectKey = `${(process.env.S3_PREFIX ?? "").replace(/^\/+/, "")}${safeKey(key)}`;
+  const url = new URL(`${c.endpoint}/${c.bucket}/${objectKey.split("/").map(encodeURIComponent).join("/")}`);
+  const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const day = amzDate.slice(0, 8);
+  const scope = `${day}/${c.region}/s3/aws4_request`;
+  const q: Record<string, string> = {
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": `${c.key}/${scope}`,
+    "X-Amz-Date": amzDate,
+    "X-Amz-Expires": String(Math.min(604800, Math.max(60, Math.round(expiresSec)))),
+    "X-Amz-SignedHeaders": "host",
+  };
+  if (downloadName) q["response-content-disposition"] = `attachment; filename="${downloadName.replace(/[^\w.\- ]+/g, "_").slice(0, 100)}"`;
+  const enc = (s: string) => encodeURIComponent(s).replace(/[!'()*]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+  const query = Object.keys(q)
+    .sort()
+    .map((k) => `${enc(k)}=${enc(q[k])}`)
+    .join("&");
+  const canonical = ["GET", url.pathname, query, `host:${url.host}`, "", "host", "UNSIGNED-PAYLOAD"].join("\n");
+  const toSign = ["AWS4-HMAC-SHA256", amzDate, scope, sha(canonical)].join("\n");
+  const kSig = hmac(hmac(hmac(hmac(`AWS4${c.secret}`, day), c.region), "s3"), "aws4_request");
+  const signature = crypto.createHmac("sha256", kSig).update(toSign).digest("hex");
+  return `${url.origin}${url.pathname}?${query}&X-Amz-Signature=${signature}`;
+}
+
+/** Largest body a Vercel function may return (4.5 MB) minus headroom. */
+export const MAX_INLINE_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Read at most MAX_INLINE_BYTES of an object. `range` (an HTTP Range header) is clamped to that
+ * window, so video seeking and chunked client downloads always fit in one function response.
+ * `total` is the full object size.
+ */
+export async function getObjectWindow(key: string, range?: string | null): Promise<{ body: Buffer; start: number; end: number; total: number; partial: boolean } | null> {
+  const m = range?.match(/bytes=(\d*)-(\d*)/);
+  let start = 0;
+  let end = MAX_INLINE_BYTES - 1;
+  if (m) {
+    if (!m[1] && m[2]) {
+      // Suffix range ("last N bytes") — resolve against the size first.
+      const head = await getObject(key, "bytes=0-0");
+      const size = head ? totalOf(head) : 0;
+      if (!size) return null;
+      start = Math.max(0, size - Number(m[2]));
+      end = size - 1;
+    } else {
+      start = m[1] ? Number(m[1]) : 0;
+      end = m[2] ? Number(m[2]) : start + MAX_INLINE_BYTES - 1;
+    }
+    end = Math.min(end, start + MAX_INLINE_BYTES - 1);
+  }
+  const obj = await getObject(key, `bytes=${start}-${end}`);
+  if (!obj) return null;
+  const total = totalOf(obj) || obj.body.length;
+  return { body: obj.body, start, end: start + obj.body.length - 1, total, partial: Boolean(m) || obj.body.length < total };
+}
+
+function totalOf(obj: { contentRange?: string; total?: number; body: Buffer }) {
+  const t = obj.contentRange?.match(/\/(\d+)$/)?.[1];
+  return t ? Number(t) : (obj.total ?? 0);
+}
+
 export async function getObjectBuffer(key: string): Promise<Buffer | null> {
   return (await getObject(key))?.body ?? null;
 }

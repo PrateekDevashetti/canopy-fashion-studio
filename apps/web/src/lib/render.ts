@@ -1,6 +1,6 @@
 "use client";
 
-import type { Adjust, AnnItem, Crop, Selection } from "./store";
+import type { AnnItem, Selection } from "./store";
 
 const cache = new Map<string, Promise<HTMLImageElement>>();
 
@@ -131,104 +131,20 @@ export function drawItems(ctx: CanvasRenderingContext2D, items: AnnItem[]) {
   }
 }
 
-export async function renderAnnotated(url: string, items: AnnItem[]): Promise<Blob> {
+/**
+ * Render only the annotation layer (transparent) at the master's resolution. `url` is the image the
+ * annotations were drawn on (the display preview) — its size sets the coordinate space.
+ */
+export async function renderOverlay(url: string, items: AnnItem[], outW: number, outH: number): Promise<Blob> {
   const img = await loadImage(url);
-  const c = canvas(img.naturalWidth, img.naturalHeight);
+  const c = canvas(outW, outH);
   const ctx = c.getContext("2d")!;
-  ctx.drawImage(img, 0, 0);
+  ctx.scale(outW / img.naturalWidth, outH / img.naturalHeight);
   await document.fonts?.ready;
   drawItems(ctx, items);
   return toBlob(c, "image/png");
 }
 
-/* ---------------- crop ---------------- */
+/* ---------------- adjustments (one implementation, shared with the server) ---------------- */
 
-export async function renderCrop(url: string, crop: Crop): Promise<Blob> {
-  const img = await loadImage(url);
-  const W = img.naturalWidth;
-  const H = img.naturalHeight;
-  const ow = crop.w * W;
-  const oh = crop.h * H;
-  const c = canvas(ow, oh);
-  const ctx = c.getContext("2d")!;
-  ctx.translate(ow / 2, oh / 2);
-  ctx.rotate((-crop.rot * Math.PI) / 180);
-  ctx.drawImage(img, -crop.cx * W, -crop.cy * H);
-  return toBlob(c, "image/png");
-}
-
-/* ---------------- adjustments ---------------- */
-
-export const isNeutral = (a: Adjust) => a.warmth === 0 && a.contrast === 1 && a.saturation === 1 && a.brightness === 0 && a.highlights === 0 && a.shadows === 0 && a.tint === 0 && a.hue === 0;
-
-export function applyAdjust(data: Uint8ClampedArray, a: Adjust) {
-  const rad = (a.hue * Math.PI) / 180;
-  const cosA = Math.cos(rad);
-  const sinA = Math.sin(rad);
-  // Hue rotation matrix (luma-preserving).
-  const m = [
-    0.213 + cosA * 0.787 - sinA * 0.213, 0.715 - cosA * 0.715 - sinA * 0.715, 0.072 - cosA * 0.072 + sinA * 0.928,
-    0.213 - cosA * 0.213 + sinA * 0.143, 0.715 + cosA * 0.285 + sinA * 0.14, 0.072 - cosA * 0.072 - sinA * 0.283,
-    0.213 - cosA * 0.213 - sinA * 0.787, 0.715 - cosA * 0.715 + sinA * 0.715, 0.072 + cosA * 0.928 + sinA * 0.072,
-  ];
-  const doHue = a.hue !== 0;
-  for (let i = 0; i < data.length; i += 4) {
-    let r = data[i];
-    let g = data[i + 1];
-    let b = data[i + 2];
-    if (doHue) {
-      const nr = r * m[0] + g * m[1] + b * m[2];
-      const ng = r * m[3] + g * m[4] + b * m[5];
-      const nb = r * m[6] + g * m[7] + b * m[8];
-      r = nr;
-      g = ng;
-      b = nb;
-    }
-    r += a.brightness * 1.1;
-    g += a.brightness * 1.1;
-    b += a.brightness * 1.1;
-    r += a.warmth * 0.35;
-    b -= a.warmth * 0.35;
-    g -= a.tint * 0.3;
-    r += a.tint * 0.12;
-    b += a.tint * 0.12;
-    const lum = Math.min(255, Math.max(0, 0.2126 * r + 0.7152 * g + 0.0722 * b)) / 255;
-    if (a.highlights) {
-      const w = lum * lum * a.highlights * 0.9;
-      r += w;
-      g += w;
-      b += w;
-    }
-    if (a.shadows) {
-      const w = (1 - lum) * (1 - lum) * a.shadows * 0.9;
-      r += w;
-      g += w;
-      b += w;
-    }
-    if (a.saturation !== 1) {
-      const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      r = l + (r - l) * a.saturation;
-      g = l + (g - l) * a.saturation;
-      b = l + (b - l) * a.saturation;
-    }
-    if (a.contrast !== 1) {
-      r = (r - 128) * a.contrast + 128;
-      g = (g - 128) * a.contrast + 128;
-      b = (b - 128) * a.contrast + 128;
-    }
-    data[i] = r;
-    data[i + 1] = g;
-    data[i + 2] = b;
-  }
-}
-
-export async function renderAdjusted(url: string, a: Adjust): Promise<Blob> {
-  const img = await loadImage(url);
-  const c = canvas(img.naturalWidth, img.naturalHeight);
-  const ctx = c.getContext("2d", { willReadFrequently: true })!;
-  ctx.drawImage(img, 0, 0);
-  const d = ctx.getImageData(0, 0, c.width, c.height);
-  applyAdjust(d.data, a);
-  ctx.putImageData(d, 0, 0);
-  return toBlob(c, "image/png");
-}
+export { applyAdjust, isNeutral } from "@fashion/core/adjust";

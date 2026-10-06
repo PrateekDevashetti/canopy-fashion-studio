@@ -12,15 +12,6 @@ export async function dims(buf: Buffer): Promise<Dims> {
   return rotated ? { width: height, height: width } : { width, height };
 }
 
-/** Normalize an upload: auto-orient, strip metadata, cap to 4096px, keep alpha as PNG. */
-export async function normalizeUpload(buf: Buffer): Promise<{ buf: Buffer; mime: string; width: number; height: number }> {
-  const img = sharp(buf, { failOn: "none" }).rotate();
-  const m = await img.metadata();
-  const resized = img.resize({ width: 4096, height: 4096, fit: "inside", withoutEnlargement: true });
-  const out = m.hasAlpha ? await resized.png().toBuffer({ resolveWithObject: true }) : await resized.jpeg({ quality: 92 }).toBuffer({ resolveWithObject: true });
-  return { buf: out.data, mime: m.hasAlpha ? "image/png" : "image/jpeg", width: out.info.width, height: out.info.height };
-}
-
 /** Provider-friendly data URI (downscaled JPEG, or PNG when transparency matters). */
 export async function toDataUri(buf: Buffer, max = 2048, keepAlpha = false): Promise<string> {
   const img = sharp(buf, { failOn: "none" }).rotate().resize({ width: max, height: max, fit: "inside", withoutEnlargement: true });

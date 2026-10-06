@@ -68,7 +68,17 @@ export const runs = pgTable(
   (t) => [index("runs_project_idx").on(t.projectId, t.createdAt), index("runs_status_idx").on(t.status, t.createdAt)],
 );
 
-export type Segment = { id: string; label: string; box: [number, number, number, number]; maskKey: string; area: number };
+export type AssetMeta = {
+  sha256?: string;
+  originalName?: string;
+  format?: string;
+  /** Share of pixels outside the edited region left untouched (0–1), for masked edits. */
+  fidelity?: number;
+  /** Model/provider that produced a result. */
+  model?: string;
+};
+
+export type Segment ={ id: string; label: string; box: [number, number, number, number]; maskKey: string; area: number };
 
 export const assets = pgTable(
   "assets",
@@ -81,8 +91,13 @@ export const assets = pgTable(
     /** upload | result | mask */
     kind: text("kind").$type<"upload" | "result" | "mask">().notNull(),
     media: text("media").$type<"image" | "video">().notNull().default("image"),
+    /** The master file: uploads are stored byte-for-byte as received; results exactly as generated. */
     storageKey: text("storage_key").notNull(),
+    /** Lightweight WebP rendition for the feed/editor when the master is large or not web-viewable. */
+    previewKey: text("preview_key"),
     posterKey: text("poster_key"),
+    /** sha256 of the master, original filename/format, and generation QA (fidelity) for results. */
+    meta: jsonb("meta").$type<AssetMeta | null>(),
     mime: text("mime").notNull(),
     width: integer("width").notNull().default(0),
     height: integer("height").notNull().default(0),

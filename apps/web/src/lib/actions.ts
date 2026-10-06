@@ -2,7 +2,7 @@
 
 import { batchSize, runCost, toolById, validateInputs, MODELS, EDITOR_OPS } from "@fashion/core/tools";
 import { api, downloadUrl, downloadZip, fileName, type AssetDTO, type RunDTO } from "./api";
-import { renderAdjusted, renderAnnotated, renderCrop, selectionEmpty, selectionMask } from "./render";
+import { renderOverlay, selectionEmpty, selectionMask } from "./render";
 import { useStudio, isPending } from "./store";
 
 const st = () => useStudio.getState();
@@ -131,12 +131,13 @@ export async function removeBackground() {
   await start("remove-background", { image: a.id }, {}, 1);
 }
 
-async function saveRendered(op: "crop" | "adjust" | "annotate", blob: Blob, parent: AssetDTO) {
+/** Edits are rendered by the server from the full-resolution master; we only send what changed. */
+async function saveRendered(op: "crop" | "adjust" | "annotate", parent: AssetDTO, send: (projectId: string) => Promise<{ asset: AssetDTO }>) {
   const s = st();
   if (!s.project) return;
   s.set({ busy: op });
   try {
-    const { asset } = await api.saveEdit(s.project.id, op, parent.id, blob);
+    const { asset } = await send(s.project.id);
     const run: RunDTO = { ...placeholder(op, EDITOR_OPS[op].name, 1), id: asset.runId!, status: "succeeded", optimistic: false, outputs: [asset], finishedAt: asset.createdAt };
     st().upsertRun(run);
     st().setActive(asset.id);
@@ -155,7 +156,8 @@ export async function saveAnnotations() {
   if (!a) return;
   const items = s.ann.items.filter((i) => i.kind !== "text" || i.text.trim());
   if (!items.length) return s.setMode("select");
-  await saveRendered("annotate", await renderAnnotated(a.url, items), a);
+  const overlay = await renderOverlay(a.url, items, a.width, a.height);
+  await saveRendered("annotate", a, (pid) => api.saveAnnotation(pid, a.id, overlay));
 }
 
 export async function saveCrop() {
@@ -164,25 +166,25 @@ export async function saveCrop() {
   if (!a) return;
   const c = s.crop;
   if (c.w >= 0.999 && c.h >= 0.999 && c.rot === 0) return s.setMode("select");
-  await saveRendered("crop", await renderCrop(a.url, c), a);
+  await saveRendered("crop", a, (pid) => api.saveEdit(pid, a.id, { op: "crop", crop: { cx: c.cx, cy: c.cy, w: c.w, h: c.h, rot: c.rot } }));
 }
 
 export async function saveAdjust() {
   const s = st();
   const a = s.active();
   if (!a) return;
-  await saveRendered("adjust", await renderAdjusted(a.url, s.adjust), a);
+  await saveRendered("adjust", a, (pid) => api.saveEdit(pid, a.id, { op: "adjust", adjust: { ...s.adjust } }));
 }
 
 export function downloadAsset(a: AssetDTO) {
-  void downloadUrl(a.url, fileName(a));
+  void downloadUrl(a.originalUrl ?? a.url, fileName(a));
 }
 
 export async function downloadAssets(list: AssetDTO[], zipName = "fashion-studio.zip") {
   if (list.length === 1) return downloadAsset(list[0]);
   st().toast(`Preparing ${list.length} files…`);
   try {
-    await downloadZip(list.map((a) => ({ url: a.url, name: fileName(a) })), zipName);
+    await downloadZip(list.map((a) => ({ url: a.originalUrl ?? a.url, name: fileName(a) })), zipName);
   } catch {
     st().toast("Download failed", "error");
   }

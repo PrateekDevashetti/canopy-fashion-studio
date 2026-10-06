@@ -3,11 +3,14 @@ import { db } from "./db/client";
 import { assets, projects, runs } from "./db/schema";
 import { debitCredits, getUser, HttpError, insertAsset, refundCredits, requireProject, runWithOutputs } from "./data";
 import { newId } from "./ids";
-import { normalizeUpload, binarizeMask, dims, maskCoverage } from "./engine/imaging";
-import { extFor, putObject } from "./storage";
+import { binarizeMask, dims, maskCoverage } from "./engine/imaging";
+import { deleteObject, getObjectBuffer, putObject } from "./storage";
+import { sha256, storeImage } from "./media";
+import { adjustImage, annotateImage, cropImage } from "./edit";
+import type { Adjust, CropSpec } from "./adjust";
 import { batchSize, EDITOR_OPS, MODELS, runCost, toolById, validateInputs, type ModelId, type Tool } from "./tools/registry";
 
-const MAX_UPLOAD = 25 * 1024 * 1024;
+const MAX_UPLOAD = 40 * 1024 * 1024;
 const HEX = /^#[0-9a-f]{6}$/i;
 
 type ToolLike = Pick<Tool, "id" | "name" | "inputs" | "cost" | "outputs" | "models" | "resolutions" | "aspects" | "media">;
@@ -130,41 +133,86 @@ async function instantRun(userId: string, projectId: string, tool: string, exist
   return id;
 }
 
+/**
+ * Store an uploaded image exactly as received — no re-encode, no resize, no metadata stripping —
+ * so the asset (and its download) is byte-identical to the user's file. A preview rendition is
+ * made separately for display.
+ */
 export async function uploadImage(userId: string, projectId: string, file: { buf: Buffer; name: string; type: string }, groupRunId?: string | null) {
   await requireProject(projectId, userId, "edit");
-  if (file.buf.length > MAX_UPLOAD) throw new HttpError(413, "Images must be under 25 MB");
-  if (!/^image\//.test(file.type) && !/\.(png|jpe?g|webp|gif|avif|heic)$/i.test(file.name)) throw new HttpError(415, "Upload an image (PNG, JPG, WebP)");
-  let norm;
+  if (file.buf.length > MAX_UPLOAD) throw new HttpError(413, "Images must be under 40 MB");
+  if (file.type && !/^image\//.test(file.type) && !/\.(png|jpe?g|webp|gif|avif|heic|heif|tiff?)$/i.test(file.name)) throw new HttpError(415, "Upload an image (PNG, JPG, WebP)");
+  const id = newId("ast");
+  let stored;
   try {
-    norm = await normalizeUpload(file.buf);
-  } catch {
+    stored = await storeImage(projectId, id, file.buf, { originalName: file.name.slice(0, 200) });
+  } catch (e) {
+    if (/pixel limit/i.test((e as Error).message)) throw new HttpError(413, "That image is too large (max 60 megapixels)");
     throw new HttpError(415, "That file isn't a readable image");
   }
   const runId = await instantRun(userId, projectId, "upload", groupRunId);
-  const id = newId("ast");
-  const key = `p/${projectId}/${id}.${extFor(norm.mime)}`;
-  await putObject(key, norm.buf);
   const name = file.name.replace(/\.[a-z0-9]+$/i, "").slice(0, 120) || "Upload";
-  return insertAsset({ id, projectId, userId, runId, kind: "upload", media: "image", storageKey: key, mime: norm.mime, width: norm.width, height: norm.height, bytes: norm.buf.length, name });
+  return insertAsset({ id, projectId, userId, runId, kind: "upload", media: "image", name, ...stored });
 }
 
-/** Save a client-side edit (crop / adjustments / annotation) as a new version in the feed. */
-export async function saveEdit(userId: string, projectId: string, op: "crop" | "adjust" | "annotate", parentId: string | null, buf: Buffer) {
+/* ---------- chunked uploads (files over the 4.5 MB function body limit) ---------- */
+
+export const UPLOAD_CHUNK = 4 * 1024 * 1024;
+const UPLOAD_ID = /^upl_[a-z0-9]{16}$/;
+const chunkKey = (projectId: string, uploadId: string, i: number) => `p/${projectId}/incoming/${uploadId}/${i}`;
+
+export async function uploadChunk(userId: string, projectId: string, uploadId: string, index: number, buf: Buffer) {
   await requireProject(projectId, userId, "edit");
-  if (buf.length > MAX_UPLOAD) throw new HttpError(413, "Image too large");
-  const norm = await normalizeUpload(buf).catch(() => {
-    throw new HttpError(415, "Invalid image");
-  });
-  if (parentId) {
-    const p = await db().query.assets.findFirst({ where: and(eq(assets.id, parentId), eq(assets.projectId, projectId)) });
-    if (!p) parentId = null;
+  if (!UPLOAD_ID.test(uploadId) || !Number.isInteger(index) || index < 0 || index * UPLOAD_CHUNK >= MAX_UPLOAD) throw new HttpError(400, "Invalid upload chunk");
+  if (buf.length === 0 || buf.length > UPLOAD_CHUNK) throw new HttpError(413, "Chunk too large");
+  await putObject(chunkKey(projectId, uploadId, index), buf);
+}
+
+/** Reassemble the chunks in order and store the file exactly like a direct upload. */
+export async function completeUpload(userId: string, projectId: string, uploadId: string, count: number, file: { name: string; type: string; sha256?: string }, groupRunId?: string | null) {
+  await requireProject(projectId, userId, "edit");
+  if (!UPLOAD_ID.test(uploadId) || !Number.isInteger(count) || count < 1 || count * UPLOAD_CHUNK > MAX_UPLOAD + UPLOAD_CHUNK) throw new HttpError(400, "Invalid upload");
+  const keys = Array.from({ length: count }, (_, i) => chunkKey(projectId, uploadId, i));
+  const parts = await Promise.all(keys.map((k) => getObjectBuffer(k)));
+  if (parts.some((p) => !p)) throw new HttpError(409, "Upload incomplete — please try again");
+  const buf = Buffer.concat(parts as Buffer[]);
+  // Integrity: the reassembled bytes must hash to what the browser computed.
+  if (file.sha256 && /^[a-f0-9]{64}$/.test(file.sha256) && sha256(buf) !== file.sha256) {
+    await Promise.all(keys.map(deleteObject));
+    throw new HttpError(422, "Upload was corrupted in transit — please try again");
   }
-  const runId = await instantRun(userId, projectId, op);
+  try {
+    return await uploadImage(userId, projectId, { buf, name: file.name, type: file.type }, groupRunId);
+  } finally {
+    await Promise.all(keys.map(deleteObject));
+  }
+}
+
+/* ---------- editor saves (rendered server-side from the full-resolution master) ---------- */
+
+export type EditPayload = { op: "crop"; crop: CropSpec } | { op: "adjust"; adjust: Adjust } | { op: "annotate"; overlay: Buffer };
+
+export async function saveEdit(userId: string, projectId: string, parentId: string, payload: EditPayload) {
+  await requireProject(projectId, userId, "edit");
+  const parent = await db().query.assets.findFirst({ where: and(eq(assets.id, parentId), eq(assets.projectId, projectId), isNull(assets.deletedAt)) });
+  if (!parent || parent.media !== "image") throw new HttpError(404, "That image no longer exists");
+  const src = await getObjectBuffer(parent.storageKey);
+  if (!src) throw new HttpError(404, "That image no longer exists");
+  let out: Buffer;
+  try {
+    out =
+      payload.op === "crop"
+        ? await cropImage(src, parent.mime, payload.crop)
+        : payload.op === "adjust"
+          ? await adjustImage(src, parent.mime, payload.adjust)
+          : await annotateImage(src, parent.mime, payload.overlay);
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message === "No adjustments to apply" ? "No adjustments to apply" : "Couldn't apply that edit");
+  }
+  const runId = await instantRun(userId, projectId, payload.op);
   const id = newId("ast");
-  const key = `p/${projectId}/${id}.${extFor(norm.mime)}`;
-  await putObject(key, norm.buf);
-  const name = EDITOR_OPS[op].label;
-  return insertAsset({ id, projectId, userId, runId, parentId, kind: "result", media: "image", storageKey: key, mime: norm.mime, width: norm.width, height: norm.height, bytes: norm.buf.length, name });
+  const stored = await storeImage(projectId, id, out);
+  return insertAsset({ id, projectId, userId, runId, parentId, kind: "result", media: "image", name: EDITOR_OPS[payload.op].label, ...stored });
 }
 
 /** Store a selection mask drawn in the editor (lasso / brush / square). Returns its storage key. */

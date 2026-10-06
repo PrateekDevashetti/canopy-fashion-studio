@@ -7,8 +7,13 @@ export type AssetDTO = {
   parentId: string | null;
   kind: "upload" | "result" | "mask";
   media: "image" | "video";
+  /** Display URL (light preview when the master is large). */
   url: string;
+  /** The master — exactly the uploaded/generated file. */
+  originalUrl: string;
   poster: string | null;
+  sha256: string | null;
+  fidelity: number | null;
   mime: string;
   width: number;
   height: number;
@@ -88,17 +93,14 @@ export const api = {
   renameProject: (id: string, name: string) => call<{ project: ProjectDTO; role: Role }>(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }),
   deleteProject: (id: string) => call<{ ok: true }>(`/api/projects/${id}`, { method: "DELETE" }),
   feed: (id: string) => call<{ runs: RunDTO[] }>(`/api/projects/${id}/feed`),
-  upload: (id: string, file: File | Blob, name?: string, runId?: string | null) => {
+  upload: (id: string, file: File | Blob, name?: string, runId?: string | null) => uploadFile(id, file, name ?? (file as File).name ?? "upload.png", runId ?? null),
+  saveEdit: (id: string, parentId: string, edit: { op: "crop"; crop: { cx: number; cy: number; w: number; h: number; rot: number } } | { op: "adjust"; adjust: Record<string, number> }) =>
+    post<{ asset: AssetDTO }>(`/api/projects/${id}/edits`, { parentId, ...edit }),
+  saveAnnotation: (id: string, parentId: string, overlay: Blob) => {
     const f = new FormData();
-    f.append("file", file, name ?? (file as File).name ?? "upload.png");
-    if (runId) f.append("runId", runId);
-    return post<{ asset: AssetDTO }>(`/api/projects/${id}/uploads`, f);
-  },
-  saveEdit: (id: string, op: "crop" | "adjust" | "annotate", parentId: string | null, blob: Blob) => {
-    const f = new FormData();
-    f.append("file", blob, `${op}.png`);
-    f.append("op", op);
-    if (parentId) f.append("parentId", parentId);
+    f.append("op", "annotate");
+    f.append("parentId", parentId);
+    f.append("overlay", overlay, "overlay.png");
     return post<{ asset: AssetDTO }>(`/api/projects/${id}/edits`, f);
   },
   saveMask: (id: string, blob: Blob) => {
@@ -158,8 +160,7 @@ export async function downloadZip(files: { url: string; name: string }[], zipNam
   const seen = new Map<string, number>();
   await Promise.all(
     files.map(async (f) => {
-      const res = await fetch(f.url);
-      const buf = new Uint8Array(await res.arrayBuffer());
+      const buf = await fetchFileBytes(f.url);
       const n = seen.get(f.name) ?? 0;
       seen.set(f.name, n + 1);
       entries[n ? f.name.replace(/(\.[a-z0-9]+)$/i, `-${n + 1}$1`) : f.name] = buf;
@@ -173,4 +174,81 @@ export async function downloadZip(files: { url: string; name: string }[], zipNam
   a.download = zipName;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+/* ---------------- uploads ---------------- */
+
+/** Matches the server: Vercel caps request bodies at 4.5 MB, so larger files go up in 4 MB chunks. */
+const CHUNK = 4 * 1024 * 1024;
+
+async function sha256Hex(blob: Blob): Promise<string | undefined> {
+  try {
+    const d = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return undefined; // insecure context — the server still validates the image
+  }
+}
+
+async function withRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      if (e instanceof ApiError && e.status >= 400 && e.status < 500 && e.status !== 408 && e.status !== 429) throw e;
+      await new Promise((r) => setTimeout(r, 500 * 2 ** i));
+    }
+  }
+  throw last;
+}
+
+/** Upload a file byte-for-byte (the server stores it unmodified). */
+async function uploadFile(projectId: string, file: Blob, name: string, runId: string | null): Promise<{ asset: AssetDTO }> {
+  if (file.size <= CHUNK) {
+    const f = new FormData();
+    f.append("file", file, name);
+    if (runId) f.append("runId", runId);
+    return withRetry(() => post<{ asset: AssetDTO }>(`/api/projects/${projectId}/uploads`, f));
+  }
+  const uploadId = `upl_${Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => "0123456789abcdefghijklmnopqrstuvwxyz"[b % 36]).join("")}`;
+  const chunks = Math.ceil(file.size / CHUNK);
+  const hash = sha256Hex(file);
+  // Up to 3 chunks in flight.
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(3, chunks) }, async () => {
+      while (next < chunks) {
+        const index = next++;
+        const f = new FormData();
+        f.append("uploadId", uploadId);
+        f.append("index", String(index));
+        f.append("chunk", file.slice(index * CHUNK, Math.min(file.size, (index + 1) * CHUNK)), `${index}`);
+        await withRetry(() => post<{ ok: true }>(`/api/projects/${projectId}/uploads`, f));
+      }
+    }),
+  );
+  return withRetry(async () => post<{ asset: AssetDTO }>(`/api/projects/${projectId}/uploads`, { uploadId, chunks, name, type: file.type, sha256: await hash, runId }));
+}
+
+/** Fetch a stored file in ≤4 MB ranges (same-origin; works for files of any size). */
+export async function fetchFileBytes(url: string): Promise<Uint8Array> {
+  const first = await fetch(url, { headers: { range: `bytes=0-${CHUNK - 1}` } });
+  if (!first.ok) throw new Error(`Download failed (${first.status})`);
+  const head = new Uint8Array(await first.arrayBuffer());
+  const total = Number(first.headers.get("content-range")?.match(/\/(\d+)$/)?.[1] ?? head.length);
+  if (first.status !== 206 || total <= head.length) return head;
+  const out = new Uint8Array(total);
+  out.set(head, 0);
+  const starts: number[] = [];
+  for (let s = head.length; s < total; s += CHUNK) starts.push(s);
+  await Promise.all(
+    starts.map(async (s) => {
+      const r = await fetch(url, { headers: { range: `bytes=${s}-${Math.min(total, s + CHUNK) - 1}` } });
+      if (r.status !== 206) throw new Error(`Download failed (${r.status})`);
+      out.set(new Uint8Array(await r.arrayBuffer()), s);
+    }),
+  );
+  return out;
 }
