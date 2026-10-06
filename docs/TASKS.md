@@ -27,15 +27,15 @@ real-model scripts in `qa/`.
 ## M2 Canvas editor — verified by e2e t04 (before the server-side edit change)
 - [x] Image stage: fit, zoom, pan, video playback
 - [x] Lasso, Brush, Square, Auto detect → mask upload; "Make a change…" region edit
-- [~] Draw / Text / Shapes save — now composited server-side from a transparent overlay; re-run t04
-- [~] Crop save — now rendered server-side from the master (unit-tested exact pixels); re-run t04
-- [~] Adjustments save — shared `@fashion/core/adjust` code, server-side; re-run t04
+- [x] Draw / Text / Shapes save — composited server-side from a transparent overlay (e2e t04)
+- [x] Crop save — rendered server-side from the master (unit-tested exact pixels, e2e t04)
+- [x] Adjustments save — shared `@fashion/core/adjust` code, server-side (e2e t04)
 - [x] Remove background, Open in Canvas, Download, Share dialog
 
 ## M3 Feed — verified by e2e t06
 - [x] Project switcher, grid/ticker + size, placeholders, failed runs, hover actions, lightbox
 - [x] Multi-select + selection panel, run header actions, details panel
-- [~] Zip/batch downloads now fetch originals in ≤4 MB ranges; re-run t06
+- [x] Zip/batch downloads fetch originals in ≤4 MB ranges (e2e t06)
 
 ## M4 Projects, team, settings — verified by e2e t02/t06
 - [x] `/studio` → latest project; `/studios` dashboard; members; `/settings`; `/s/[token]` + reviews; Open in Canvas
@@ -50,7 +50,8 @@ real-model scripts in `qa/`.
 ## M8 QA loop
 - [x] `tests/e2e` end-to-end suite (real models, edits, feed actions, hardening)
 - [x] `qa/consistency.mts`, `qa/color-match.mts`, `qa/identity.mts` real-model consistency checks
-- [~] Re-run full e2e after migration 0002 is applied locally
+- [x] Full e2e re-run after migration 0002: 26/26 (tour click now retries instead of a fixed wait)
+- [x] `qa/exact-upload.mts` live: 1.1 MB direct + 21.6 MB chunked uploads byte-identical; presigned R2 download identical
 
 ## M10 Production hardening (CTO review — docs/CTO-REVIEW.md)
 - [x] Uploads stored byte-for-byte (sha256 recorded); results stored exactly as generated; WebP previews
@@ -60,7 +61,7 @@ real-model scripts in `qa/`.
 - [x] Pad-to-aspect in-place edits, drift check + retry, auto garment mask, Lab color-accuracy pass
 - [x] Identity references (face/outfit close-ups) + identity-lock prompts
 - [x] Rate limits, Origin check, security headers, security event logs, health golden signals, SLO doc
-- [!] Apply `packages/core/migrations/0002_asset_previews_meta.sql` locally (`npm run db:push`) — needs approval
+- [x] Migration 0002 applied locally
 
 ## M9 Ship
 - [x] Push to GitHub

@@ -10,13 +10,20 @@ test("the guided tour runs end to end", async ({ browser, screen }) => {
   await expect(screen.getByText("Start with a sketch")).toBeVisible({ timeout: 60_000 });
   await browser.locator('[data-tour="generate"]').click();
   await expect(screen.getByText("Select your garment")).toBeVisible({ timeout: 60_000 });
-  // Let the cached garment regions load before clicking the jacket.
-  await browser.evaluate(() => new Promise((r) => setTimeout(r, 1500)));
+  // The garment regions load asynchronously (slow on a cold dev server): click until the jacket is picked.
   const box = await browser.locator("[data-stage-image]").boundingBox();
-  await browser.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
-  await browser.mouse.down();
-  await browser.mouse.up();
-  await expect(screen.getByText("Recolor your garment")).toBeVisible({ timeout: 30_000 });
+  for (let attempt = 0; attempt < 8; attempt++) {
+    await browser.evaluate(() => new Promise((r) => setTimeout(r, 1500)));
+    await browser.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await browser.mouse.down();
+    await browser.mouse.up();
+    try {
+      await expect(screen.getByText("Recolor your garment")).toBeVisible({ timeout: 3_000 });
+      break;
+    } catch (e) {
+      if (attempt === 7) throw e;
+    }
+  }
   await browser.locator('[data-tour="generate"]').click();
   await expect(screen.getByText("Try it on").first()).toBeVisible({ timeout: 60_000 });
   await browser.locator('[data-tour="generate"]').click();
