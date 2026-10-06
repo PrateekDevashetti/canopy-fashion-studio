@@ -37,6 +37,9 @@ export function DetailsPanel() {
         ["Model", info?.run?.model || (info ? "—" : "…")],
         ["Generation time", info?.run?.durationMs != null ? `${(info.run.durationMs / 1000).toFixed(1)}s` : info ? "—" : "…"],
         ["Created", new Date(a.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })],
+        ...(a.fidelity != null ? ([["Outside edit", `${(a.fidelity * 100).toFixed(1)}% unchanged`]] as [string, string][]) : []),
+        ...(a.colorDelta != null ? ([["Color accuracy", `ΔE ${a.colorDelta.toFixed(1)}${a.colorDelta < 2 ? " · exact" : a.colorDelta < 5 ? " · close" : ""}`]] as [string, string][]) : []),
+        ...(a.sha256 ? ([["Checksum", `SHA-256 ${a.sha256.slice(0, 10)}…`]] as [string, string][]) : []),
       ]
     : [];
 

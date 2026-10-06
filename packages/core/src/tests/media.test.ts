@@ -92,3 +92,62 @@ test("masked composite leaves every pixel outside the selection identical", asyn
   // Corner region (well outside the box + feather) must be untouched.
   for (let y = 0; y < 20; y++) for (let x = 0; x < 20; x++) for (let c = 0; c < 3; c++) assert.equal(r[(y * 120 + x) * 3 + c], o[(y * 120 + x) * 3 + c]);
 });
+
+test("feathered/dilated composites land exactly where the mask is", async () => {
+  const W = 300, H = 200;
+  const original = await sharp({ create: { width: W, height: H, channels: 3, background: "#808080" } }).png().toBuffer();
+  const edited = await sharp({ create: { width: W, height: H, channels: 3, background: "#ff0000" } }).png().toBuffer();
+  // Mask on the right side only.
+  const mask = await imaging.boxMask({ width: W, height: H }, [0.6, 0.2, 0.9, 0.8]);
+  for (const opts of [{}, { dilate: 3 }, { feather: 4, dilate: 10 }]) {
+    const out = await imaging.compositeMasked(original, edited, mask, opts);
+    const px = await sharp(out).removeAlpha().raw().toBuffer();
+    const at = (x: number, y: number) => [...px.subarray((y * W + x) * 3, (y * W + x) * 3 + 3)];
+    assert.deepEqual(at(225, 100), [255, 0, 0], `inside the mask is edited ${JSON.stringify(opts)}`);
+    assert.deepEqual(at(60, 100), [128, 128, 128], `left side untouched ${JSON.stringify(opts)}`);
+    assert.deepEqual(at(150, 100), [128, 128, 128], `middle untouched ${JSON.stringify(opts)}`);
+  }
+});
+
+test("color match moves the garment onto the requested color and leaves the rest", async () => {
+  const W = 200, H = 200;
+  // Mid-blue "fabric" with texture in a box, grey around it.
+  const raw = Buffer.alloc(W * H * 3);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 3;
+    const inBox = x >= 50 && x < 150 && y >= 50 && y < 150;
+    const n = ((x * 7 + y * 13) % 11) - 5;
+    raw.set(inBox ? [70 + n, 100 + n, 160 + n] : [200, 200, 200], i);
+  }
+  const img = await sharp(raw, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer();
+  const mask = await imaging.boxMask({ width: W, height: H }, [0.25, 0.25, 0.75, 0.75]);
+  const r = await imaging.matchGarmentColor(img, mask, "#1f2a44");
+  assert.ok(r.deltaBefore > 15 && r.deltaAfter < 4, `ΔE ${r.deltaBefore} → ${r.deltaAfter}`);
+  const px = await sharp(r.buf).raw().toBuffer();
+  assert.deepEqual([...px.subarray(0, 3)], [200, 200, 200], "outside untouched");
+});
+
+test("pad → unpad round-trips odd aspect ratios without stretching", async () => {
+  const input = await photo(1000, 1700, "png"); // ~0.588, between 9:16 and 2:3
+  const { buf, pad } = await imaging.padToAspect(input);
+  const m = await sharp(buf).metadata();
+  assert.ok(["2:3", "9:16"].includes(pad.aspect));
+  const [, r] = imaging.ASPECTS.find(([a]) => a === pad.aspect)!;
+  assert.ok(Math.abs(m.width! / m.height! - r) < 0.003, "padded frame matches the model aspect");
+  // Simulate a model returning the padded frame at a different resolution, untouched.
+  const modelOut = await sharp(buf).resize(Math.round(m.width! * 0.6), Math.round(m.height! * 0.6)).png().toBuffer();
+  const back = await imaging.unpad(modelOut, pad);
+  const bm = await sharp(back).metadata();
+  assert.deepEqual([bm.width, bm.height], [1000, 1700]);
+  assert.ok((await imaging.outsideDrift(input, back, null)) < 0.03, "content stays aligned");
+});
+
+test("drift detects a reframed edit but ignores the masked region", async () => {
+  const input = await photo(400, 400, "png");
+  const mask = await imaging.boxMask({ width: 400, height: 400 }, [0.3, 0.3, 0.7, 0.7]);
+  const blue = await sharp({ create: { width: 160, height: 160, channels: 3, background: "#00f" } }).png().toBuffer();
+  const inside = await sharp(input).composite([{ input: blue, left: 120, top: 120 }]).png().toBuffer();
+  assert.ok((await imaging.outsideDrift(input, inside, mask)) < 0.01, "changes inside the mask don't count");
+  const shifted = await sharp(input).extract({ left: 40, top: 40, width: 360, height: 360 }).resize(400, 400).png().toBuffer();
+  assert.ok((await imaging.outsideDrift(input, shifted, mask)) > 0.08, "a reframe is flagged");
+});

@@ -58,6 +58,27 @@ async function maskFor(imageUri: string, size: { width: number; height: number }
   return boxMask(size, [x0, y0, x1, y1]);
 }
 
+const LOCATE_PROMPT = `Locate the main person's face (forehead to chin, ear to ear) and their full outfit (all worn garments and accessories, excluding the head) in this fashion image.
+Return JSON: {"face":[ymin,xmin,ymax,xmax] or null,"outfit":[ymin,xmin,ymax,xmax] or null} with integer coordinates normalized to 0-1000. Use null when not visible.`;
+
+type Box = [number, number, number, number];
+const toBox = (b: unknown): Box | null =>
+  Array.isArray(b) && b.length === 4 && b.every((n) => Number.isFinite(n)) ? ([b[1], b[0], b[3], b[2]].map((v: number) => Math.min(1000, Math.max(0, v)) / 1000) as Box) : null;
+
+/**
+ * Where are the face and the outfit? Used to hand the image model close-up identity and garment
+ * references (a proven way to keep faces and prints consistent across new shots). Never throws.
+ */
+export async function locateSubject(buf: Buffer): Promise<{ face: Box | null; outfit: Box | null }> {
+  try {
+    const res = await visionJson<{ face?: unknown; outfit?: unknown }>(VISION_MODEL(), LOCATE_PROMPT, [await toDataUri(buf, 1024)]);
+    return { face: toBox(res.face), outfit: toBox(res.outfit) };
+  } catch (e) {
+    console.warn("[detect] locate failed:", (e as Error).message.slice(0, 120));
+    return { face: null, outfit: null };
+  }
+}
+
 /**
  * Detect editable garment regions on an image asset. Cached on the asset, so
  * re-opening auto-detect is instant and free.

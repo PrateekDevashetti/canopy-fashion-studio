@@ -14,6 +14,7 @@ export type AssetDTO = {
   poster: string | null;
   sha256: string | null;
   fidelity: number | null;
+  colorDelta: number | null;
   mime: string;
   width: number;
   height: number;

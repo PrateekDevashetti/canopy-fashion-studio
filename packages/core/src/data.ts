@@ -225,6 +225,7 @@ export function serializeAsset(a: AssetRow) {
     poster: fileUrl(a.posterKey),
     sha256: a.meta?.sha256 ?? null,
     fidelity: a.meta?.fidelity ?? null,
+    colorDelta: a.meta?.colorDelta ?? null,
     mime: a.mime,
     width: a.width,
     height: a.height,

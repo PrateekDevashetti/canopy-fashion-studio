@@ -74,6 +74,8 @@ export type AssetMeta = {
   format?: string;
   /** Share of pixels outside the edited region left untouched (0–1), for masked edits. */
   fidelity?: number;
+  /** Recolor: CIE ΔE between the garment's mean color and the requested color (lower is closer; <2 is imperceptible). */
+  colorDelta?: number;
   /** Model/provider that produced a result. */
   model?: string;
 };

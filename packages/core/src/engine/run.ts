@@ -6,7 +6,8 @@ import { getAsset, insertAsset, refundCredits } from "../data";
 import { newId } from "../ids";
 import { extFor, getObjectBuffer, putObject } from "../storage";
 import { EDITOR_OPS, toolById } from "../tools/registry";
-import { chromaKey, compositeMasked, cropToMask, dims, highlightRegion, maskCoverage, toDataUri } from "./imaging";
+import { chromaKey, compositeMasked, cropBox, cropToMask, dims, highlightRegion, matchGarmentColor, nearestAspect, outsideDrift, padMask, padToAspect, toDataUri, unpad } from "./imaging";
+import { detectGarments, locateSubject } from "./detect";
 import { download, falRun, falSubmit, falWait, openrouterImage, ProviderError, providerDown, tripIfFatal, type QueueRef } from "./providers";
 import { ANGLES, P, SHOOT_SHOTS } from "./prompts";
 import sharp from "sharp";
@@ -51,8 +52,6 @@ function aspectFor(settings: Settings, allowAuto: boolean) {
   return a;
 }
 
-const ASPECTS: [string, number][] = [["1:1", 1], ["4:5", 0.8], ["3:4", 0.75], ["2:3", 2 / 3], ["9:16", 9 / 16], ["5:4", 1.25], ["4:3", 4 / 3], ["3:2", 1.5], ["16:9", 16 / 9]];
-export const nearestAspect = (r: number) => ASPECTS.reduce((a, b) => (Math.abs(Math.log(b[1] / r)) < Math.abs(Math.log(a[1] / r)) ? b : a))[0];
 
 const isPolicy = (e: unknown) => e instanceof ProviderError && (e.status === 422 || /content.?polic|flagged|safety/i.test(e.message));
 
@@ -155,7 +154,7 @@ async function removeBackground(buf: Buffer): Promise<Buffer> {
   const [green] = await openrouterImage(
     "Keep the main subject exactly as it is (same position, scale, framing, shape, colors and details) and replace the entire background with a perfectly flat pure chroma-key green (#00FF00). Do not crop, zoom or move the subject. No shadows on the background, no green spill on the subject.",
     [await toDataUri(buf)],
-    { aspect: nearestAspect(width / height) },
+    { aspect: nearestAspect(width / height)[0] },
   );
   return chromaKey(green, buf);
 }
@@ -172,9 +171,61 @@ async function video(run: RunRow, endpoint: string, input: Record<string, unknow
   return (await download(out.video.url)).buf;
 }
 
+/* ---------------- consistency ---------------- */
+
+/** Mean luminance drift outside the edit region above which we assume the model reframed or relit. */
+const DRIFT_OK = 0.08;
+
+/**
+ * In-place edits (recolor, fabric swap, region edit, described garment swap):
+ * pad to a supported aspect (no stretching) → generate → un-pad → check the model kept the frame
+ * (retry once if it drifted) → composite, so every pixel outside the mask is the original.
+ */
+async function inPlaceEdit(o: { prompt: string; base: Buffer; mask: Buffer | null; extra?: Buffer[]; settings: Settings; tier: Tier; dilate?: number }): Promise<{ buf: Buffer; meta: AssetMeta }> {
+  const { buf: padded, pad } = await padToAspect(o.base);
+  const pmask = o.mask ? await padMask(o.mask, pad) : null;
+  const refs = [padded, ...(pmask ? [await highlightRegion(padded, pmask)] : []), ...(o.extra ?? [])];
+  let best: { out: Buffer; drift: number } | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const out = await unpad(await one(o.prompt, refs, { ...o.settings, aspect: pad.aspect }, o.tier), pad);
+    const drift = await outsideDrift(o.base, out, o.mask);
+    if (!best || drift < best.drift) best = { out, drift };
+    // Without a mask the "outside" includes the intended change, so drift isn't meaningful.
+    if (!o.mask || drift <= DRIFT_OK) break;
+    console.warn(`[engine] edit drifted outside its region (${drift.toFixed(3)}) — retrying once`);
+  }
+  const buf = o.mask ? await compositeMasked(o.base, best!.out, o.mask, { dilate: o.dilate ?? 2 }) : best!.out;
+  return { buf, meta: o.mask ? { fidelity: Math.round((1 - best!.drift) * 1000) / 1000 } : {} };
+}
+
+/** The main garment's mask (largest detected garment), so whole-garment edits can be composited too. */
+async function autoGarmentMask(assetId: string): Promise<{ mask: Buffer; label: string } | null> {
+  try {
+    const a = await getAsset(assetId);
+    if (!a || a.media !== "image") return null;
+    const segs = await detectGarments(a);
+    const main = [...segs].sort((x, y) => y.area - x.area).find((g) => g.area > 0.02 && g.area < 0.9);
+    const mask = main ? await getObjectBuffer(main.maskKey) : null;
+    return mask && main ? { mask, label: main.label } : null;
+  } catch (e) {
+    console.warn("[engine] auto garment mask unavailable:", (e as Error).message.slice(0, 120));
+    return null;
+  }
+}
+
+/** Close-up face and outfit crops: extra references that keep identity and garment detail consistent in new shots. */
+async function identityRefs(buf: Buffer): Promise<{ bufs: Buffer[]; flags: { face: boolean; outfit: boolean } }> {
+  const loc = await locateSubject(buf);
+  const face = loc.face ? await cropBox(buf, loc.face, 0.35, 768).catch(() => null) : null;
+  const o = loc.outfit;
+  // An outfit box covering most of the frame adds nothing over the main image.
+  const outfit = o && (o[2] - o[0]) * (o[3] - o[1]) < 0.6 ? await cropBox(buf, o, 0.05, 1024).catch(() => null) : null;
+  return { bufs: [face, outfit].filter((b): b is Buffer => !!b), flags: { face: !!face, outfit: !!outfit } };
+}
+
 /* ---------------- tools ---------------- */
 
-const png = (buf: Buffer, name: string, parentId?: string): Output => ({ buf, mime: "image/png", name, parentId });
+const png = (buf: Buffer, name: string, parentId?: string, meta?: AssetMeta): Output => ({ buf, mime: "image/png", name, parentId, meta });
 
 async function execute(ctx: Ctx) {
   const { run, settings, emit } = ctx;
@@ -215,16 +266,18 @@ async function execute(ctx: Ctx) {
     }
     case "garment-recolor": {
       const [g] = await imgs("garment");
-      const mask = await loadMask(pid, i.mask);
-      const label = text("maskLabel");
       const colors = (Array.isArray(i.colors) ? i.colors : []) as { hex: string; name?: string }[];
-      const partMask = mask ? (await maskCoverage(mask)) < 0.18 : false;
+      // No selection → find the main garment, so the rest of the image is guaranteed untouched.
+      const drawn = await loadMask(pid, i.mask);
+      const auto = drawn ? null : await autoGarmentMask(g.id);
+      const mask = drawn ?? auto?.mask ?? null;
+      const label = text("maskLabel") || auto?.label || "";
       await Promise.all(
         colors.map(async (c) => {
-          const refs = mask ? [g.buf, await highlightRegion(g.buf, mask)] : [g.buf];
-          let out = await one(P.recolor(c, !!mask, label), refs, settings, "fast");
-          if (mask && partMask) out = await compositeMasked(g.buf, out, mask, { dilate: 2 });
-          await emit(png(out, `Recolor ${c.name ?? c.hex}`, g.id));
+          const r = await inPlaceEdit({ prompt: P.recolor(c, !!mask, label), base: g.buf, mask, settings, tier: "fast", dilate: 2 });
+          // Models under-shoot dye changes; pull the fabric onto the exact requested color.
+          const fixed = mask ? await matchGarmentColor(r.buf, mask, c.hex) : null;
+          await emit(png(fixed?.buf ?? r.buf, `Recolor ${c.name ?? c.hex}`, g.id, { ...r.meta, ...(fixed ? { colorDelta: Math.round(fixed.deltaAfter * 10) / 10 } : {}) }));
         }),
       );
       return;
@@ -232,15 +285,15 @@ async function execute(ctx: Ctx) {
     case "fabric-swap": {
       const [g] = await imgs("garment");
       const fabrics = await imgs("fabric");
-      const mask = await loadMask(pid, i.mask);
-      const label = text("maskLabel");
-      const partMask = mask ? (await maskCoverage(mask)) < 0.18 : false;
+      const drawn = await loadMask(pid, i.mask);
+      const auto = drawn ? null : await autoGarmentMask(g.id);
+      const mask = drawn ?? auto?.mask ?? null;
+      const label = text("maskLabel") || auto?.label || "";
       await Promise.all(
         fabrics.map(async (f) => {
-          const refs = mask ? [g.buf, f.buf, await highlightRegion(g.buf, mask)] : [g.buf, f.buf];
-          let out = await one(P.fabric(!!mask, label), refs, settings, "pro");
-          if (mask && partMask) out = await compositeMasked(g.buf, out, mask, { dilate: 3 });
-          await emit(png(out, "Fabric swap", g.id));
+          // Image order for the prompt: 1 = garment, 2 = highlight (when masked), then the swatch.
+          const r = await inPlaceEdit({ prompt: P.fabric(!!mask, label), base: g.buf, mask, extra: [f.buf], settings, tier: "pro", dilate: 3 });
+          await emit(png(r.buf, "Fabric swap", g.id, r.meta));
         }),
       );
       return;
@@ -268,19 +321,19 @@ async function execute(ctx: Ctx) {
       const label = text("maskLabel");
       // With a garment image, FASHN swaps it in directly; a written description goes through Nano Banana Pro.
       if (garment) return emit(png(await tryOn(base.buf, garment.buf, settings, P.garmentSwap(label)), "Garment swap", base.id));
-      const marked = mask ? await highlightRegion(base.buf, mask) : base.buf;
-      let out = await one(P.garmentSwap(label, text("description")), [base.buf, marked], settings, "pro");
-      if (mask) out = await compositeMasked(base.buf, out, mask, { dilate: 10 });
-      return emit(png(out, "Garment swap", base.id));
+      const r = await inPlaceEdit({ prompt: P.garmentSwap(label, text("description")), base: base.buf, mask, settings, tier: "pro", dilate: 10 });
+      return emit(png(r.buf, "Garment swap", base.id, r.meta));
     }
     case "photo-shoot": {
       const [look] = await imgs("look");
-      await Promise.all(SHOOT_SHOTS.map(async (shot) => emit(png(await one(P.photoShoot(text("location"), shot), [look.buf], settings, "pro"), "Photo shoot", look.id))));
+      const id = await identityRefs(look.buf);
+      await Promise.all(SHOOT_SHOTS.map(async (shot) => emit(png(await one(P.photoShoot(text("location"), shot, id.flags), [look.buf, ...id.bufs], settings, "pro"), "Photo shoot", look.id))));
       return;
     }
     case "multi-angle": {
       const [shot] = await imgs("shot");
-      await Promise.all(ANGLES.map(async (a) => emit(png(await one(P.angle(a.prompt), [shot.buf], settings, "pro"), a.name, shot.id))));
+      const id = await identityRefs(shot.buf);
+      await Promise.all(ANGLES.map(async (a) => emit(png(await one(P.angle(a.prompt, id.flags), [shot.buf, ...id.bufs], settings, "pro"), a.name, shot.id))));
       return;
     }
     case "garment-360":
@@ -321,8 +374,8 @@ async function execute(ctx: Ctx) {
       const [img] = await imgs("image");
       const mask = await loadMask(pid, i.mask);
       if (!mask) throw new ProviderError("Select a region first.", 400);
-      const out = await one(P.regionEdit(text("prompt")), [img.buf, await highlightRegion(img.buf, mask)], { ...settings, aspect: "Auto" }, "pro");
-      return emit(png(await compositeMasked(img.buf, out, mask, { dilate: 2 }), "Region edited", img.id));
+      const r = await inPlaceEdit({ prompt: P.regionEdit(text("prompt")), base: img.buf, mask, settings, tier: "pro", dilate: 2 });
+      return emit(png(r.buf, "Region edited", img.id, r.meta));
     }
     case "remove-background": {
       const [img] = await imgs("image");

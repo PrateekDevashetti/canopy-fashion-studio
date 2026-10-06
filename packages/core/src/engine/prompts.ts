@@ -1,6 +1,22 @@
 /** Production prompts for each tool. Kept in one place so they can be tuned and tested. */
 
-const KEEP = "Preserve every construction detail exactly: seams, stitching, panels, pockets, closures, hardware, trims, labels, prints, fabric texture and drape.";
+const KEEP = "Preserve every construction detail exactly: seams, stitching, panels, pockets, closures, hardware, trims, labels, logos, prints, fabric texture and drape.";
+
+/** Identity lock — spell out what must not change about the person (works far better than "same person"). */
+const IDENTITY =
+  "Keep the person's identity exactly: the same face shape, eyes, eyebrows, nose, lips, jawline, skin tone and skin texture, freckles and marks, hairstyle, hair color and length, body shape and proportions. Do not beautify, age, slim or restyle them.";
+
+/** Edits that must come back pixel-aligned with the input so they can be composited. */
+const FRAME = "Return the full image at exactly the same framing, size and camera position — do not crop, zoom, shift, rotate or re-light it.";
+
+/** Describe the close-up references appended after the main image. */
+export function refNotes(refs: { face?: boolean; outfit?: boolean }, firstIndex = 2): string {
+  const notes: string[] = [];
+  let i = firstIndex;
+  if (refs.face) notes.push(`Image ${i++} is a close-up of the model's face: reproduce exactly this person.`);
+  if (refs.outfit) notes.push(`Image ${i++} is a close-up of the outfit: reproduce every garment detail, color, print and logo exactly.`);
+  return notes.join(" ");
+}
 
 export const P = {
   prompt: (text: string, hasRefs: boolean) =>
@@ -54,13 +70,15 @@ export const P = {
       `Recolor ${masked ? `only the highlighted ${label ? label.toLowerCase() : "garment area"}` : "the main garment"} to ${color.name ? `${color.name} (${color.hex})` : color.hex}.`,
       "Change the dye color only: keep the exact fabric texture, weave, sheen, folds, shading, highlights, stitching, hardware and shape.",
       "Everything else in the image — skin, background, other garments, lighting, framing — must stay identical.",
+      FRAME,
     ].join(" "),
 
   fabric: (masked: boolean, label?: string) =>
     [
-      `Re-make ${masked ? `only the highlighted ${label ? label.toLowerCase() : "area"} of the garment` : "the garment"} in the material shown in the swatch image (second image).`,
+      `Re-make ${masked ? `only the highlighted ${label ? label.toLowerCase() : "area"} of the garment` : "the garment"} in the material shown in the swatch image (the ${masked ? "third" : "second"} image).`,
       "Match the swatch's fiber, weave or knit structure, pattern scale, color, sheen and weight, and let the fabric drape and crease the way that material would.",
       "Keep the garment's silhouette, construction, seams, closures and the rest of the image identical.",
+      FRAME,
     ].join(" "),
 
   modelHeadshot: (desc: string, hasRef: boolean) =>
@@ -73,15 +91,16 @@ export const P = {
       .join(" "),
 
   modelHeadshotSheet: () =>
-    "Using the person in this image, create a headshot reference sheet: three photos side by side on a light grey studio backdrop — front, three-quarter and full profile — same person, same hair, same lighting, same plain white tank top. Identical identity across all three. Photorealistic, no text or labels.",
+    `Using the person in this image, create a headshot reference sheet: three photos side by side on a light grey studio backdrop — front, three-quarter and full profile — same hair, same lighting, same plain white tank top. ${IDENTITY} Identical identity across all three. Photorealistic, no text or labels.`,
 
   modelBodySheet: () =>
-    "Using the person in this image, create a full-body model reference sheet: three full-length photos side by side on a light grey studio backdrop — front, side and back — same person, standing in a neutral pose, wearing a plain white tank top and fitted grey shorts, barefoot. Identical identity and proportions across all three. Photorealistic, no text or labels.",
+    `Using the person in this image, create a full-body model reference sheet: three full-length photos side by side on a light grey studio backdrop — front, side and back — standing in a neutral pose, wearing a plain white tank top and fitted grey shorts, barefoot. ${IDENTITY} Identical identity and proportions across all three. Photorealistic, no text or labels.`,
 
   tryOn: () =>
     [
       "Dress the model from the first image in the garment from the second image.",
-      "Keep the model's face, identity, body, pose, hair, background and lighting exactly as they are.",
+      "Keep the model's pose, background and lighting exactly as they are.",
+      IDENTITY,
       "The garment must fit naturally on the body with realistic drape, tension and shadows, at the right scale.",
       KEEP,
     ].join(" "),
@@ -89,27 +108,41 @@ export const P = {
   garmentSwap: (label?: string, description?: string) =>
     [
       `In the first image, replace the highlighted ${label ? label.toLowerCase() : "garment"} (shown in the second image with a magenta tint) with ${description?.trim() ? `this new garment: ${description.trim()}` : "the new garment from the third image"}.`,
-      "Keep the model's face, body, pose, hair, other clothing, background and lighting identical. The new garment must fit the body naturally with correct drape and shadows.",
+      "Keep the model's pose, other clothing, background and lighting identical. The new garment must fit the body naturally with correct drape and shadows.",
+      IDENTITY,
       KEEP,
+      FRAME,
     ].join(" "),
 
-  photoShoot: (location: string, shot: string) =>
+  photoShoot: (location: string, shot: string, refs: { face?: boolean; outfit?: boolean } = {}) =>
     [
-      `Stage an editorial fashion photo of the same model wearing the exact same outfit in a new location: ${location.trim()}.`,
+      `Stage an editorial fashion photo of the same model from image 1 wearing the exact same outfit in a new location: ${location.trim()}.`,
       `Shot: ${shot}.`,
-      "Keep the model's identity, hair and every detail of the outfit identical. Natural, believable light for the location, professional campaign photography, no text.",
-    ].join(" "),
+      refNotes(refs),
+      IDENTITY,
+      `Keep every detail of the outfit identical. ${KEEP}`,
+      "Natural, believable light for the location, professional campaign photography, no text.",
+    ]
+      .filter(Boolean)
+      .join(" "),
 
-  angle: (angle: string) =>
+  angle: (angle: string, refs: { face?: boolean; outfit?: boolean } = {}) =>
     [
-      `Reshoot this exact image from a new camera angle: ${angle}.`,
-      "Same subject, same garment details, same lighting, same background and styling — only the camera position changes. Photorealistic, consistent identity, no text.",
-    ].join(" "),
+      `Reshoot image 1 from a new camera angle: ${angle}.`,
+      "Same subject, same garment details, same lighting, same background and styling — only the camera position changes.",
+      refNotes(refs),
+      IDENTITY,
+      KEEP,
+      "Photorealistic, no text.",
+    ]
+      .filter(Boolean)
+      .join(" "),
 
   regionEdit: (instruction: string) =>
     [
       `Edit only the region highlighted in magenta in the second image: ${instruction.trim()}.`,
       "Return the full first image with that change applied. Keep everything outside the highlighted region identical, and blend the edit seamlessly with matching lighting, perspective and texture. Do not include the magenta highlight in the result.",
+      FRAME,
     ].join(" "),
 
   garment360: (hasBack: boolean) =>
