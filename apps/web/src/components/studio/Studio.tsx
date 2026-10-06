@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { identify, pageview } from "@/lib/analytics";
 import { useStudio, isPending } from "@/lib/store";
 import { ConfirmProvider, Spinner } from "@/components/ui";
 import { TopBar } from "./TopBar";
@@ -29,7 +30,15 @@ export function Studio({ projectId }: { projectId: string }) {
       .getState()
       .init(projectId)
       .catch((e) => setError(e.message));
+    pageview();
   }, [projectId]);
+
+  // Attribute analytics to the signed-in (or guest) user.
+  const meId = s.me?.id;
+  useEffect(() => {
+    const me = useStudio.getState().me;
+    if (me) identify(me);
+  }, [meId]);
 
   // Poll: fast while anything is generating, slow otherwise (picks up teammates' runs).
   const pending = s.runs.some(isPending);

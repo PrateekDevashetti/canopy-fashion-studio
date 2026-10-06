@@ -22,6 +22,16 @@ export function Filmstrip({ rightOpen }: { rightOpen: boolean }) {
   const runs = useStudio((s) => s.runs);
   const activeId = useStudio((s) => s.activeId);
   const setActive = useStudio((s) => s.setActive);
+  // Images the open tool is applying to get the green ring (white = open in the editor).
+  const boundKey = useStudio((s) => {
+    const ins = s.toolId ? s.tools[s.toolId]?.inputs : null;
+    if (!ins) return "";
+    return Object.values(ins)
+      .flatMap((v) => (Array.isArray(v) ? v : [v]))
+      .filter((v): v is string => typeof v === "string" && v.startsWith("ast_"))
+      .join(",");
+  });
+  const bound = new Set(boundKey ? boundKey.split(",") : []);
   const pinned = useStudio((s) => s.stripPinned);
   const set = useStudio((s) => s.set);
   const now = useNow();
@@ -65,7 +75,11 @@ export function Filmstrip({ rightOpen }: { rightOpen: boolean }) {
                       e.dataTransfer.effectAllowed = "copy";
                     }}
                     aria-label={o.name}
-                    className={cn("relative h-[46px] w-[46px] overflow-hidden rounded-[6px] border-2 transition-colors", o.id === activeId ? "border-white" : "border-transparent hover:border-white/30")}
+                    className={cn(
+                      "relative h-[46px] w-[46px] overflow-hidden rounded-[6px] border-2 transition-[border-color,box-shadow]",
+                      o.id === activeId ? "border-white" : "border-transparent hover:border-white/30",
+                      bound.has(o.id) && "shadow-[0_0_0_2px_#161616,0_0_0_4.5px_#7fd27f]",
+                    )}
                     onClick={() => setActive(o.id)}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}

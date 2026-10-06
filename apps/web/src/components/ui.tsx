@@ -135,7 +135,7 @@ export function Tip({ label, children, side = "bottom", kbd }: { label: string; 
   );
 }
 
-export function Modal({ open, onClose, children, className, title }: { open: boolean; onClose: () => void; children: ReactNode; className?: string; title?: string }) {
+export function Modal({ open, onClose, children, className, title, width }: { open: boolean; onClose: () => void; children: ReactNode; className?: string; title?: string; width?: number }) {
   useEffect(() => {
     if (!open) return;
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -145,7 +145,7 @@ export function Modal({ open, onClose, children, className, title }: { open: boo
   if (!open || typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[80] flex animate-fade-in items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-label={title} className={cn("panel relative w-full max-w-[440px] animate-pop p-5 shadow-2xl", className)}>
+      <div role="dialog" aria-label={title} className={cn("panel relative w-full max-w-[440px] animate-pop p-5 shadow-2xl", className)} style={width ? { maxWidth: width } : undefined}>
         {title && <h2 className="mb-4 pr-8 text-[15px] font-medium">{title}</h2>}
         <button aria-label="Close" onClick={onClose} className="icon-btn absolute top-3 right-3 h-7 w-7">
           <X size={15} />

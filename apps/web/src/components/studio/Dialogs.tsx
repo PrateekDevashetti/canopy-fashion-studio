@@ -8,7 +8,7 @@ import { Modal, Spinner } from "@/components/ui";
 
 type Members = Awaited<ReturnType<typeof api.members>>;
 
-function MembersSection() {
+export function MembersSection() {
   const project = useStudio((s) => s.project)!;
   const toast = useStudio((s) => s.toast);
   const [data, setData] = useState<Members | null>(null);

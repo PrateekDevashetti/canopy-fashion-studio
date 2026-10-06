@@ -1,6 +1,8 @@
 "use client";
 
 import { batchSize, runCost, toolById, validateInputs, MODELS, EDITOR_OPS } from "@fashion/core/tools";
+import { track } from "./analytics";
+import { toolSettings } from "./prefs";
 import { api, downloadUrl, downloadZip, fileName, type AssetDTO, type RunDTO } from "./api";
 import { renderOverlay, selectionEmpty, selectionMask } from "./render";
 import { useStudio, isPending } from "./store";
@@ -66,6 +68,7 @@ export async function generate(toolId: string) {
   const s = st();
   const tool = toolById(toolId);
   if (!tool) return;
+  track("generate_clicked", { tool: toolId, tour: s.welcome === "tour" });
   if (s.welcome === "tour") {
     const { tourGenerate } = await import("./tour");
     return tourGenerate(toolId);
@@ -88,7 +91,7 @@ export async function generate(toolId: string) {
   }
   const problem = validateInputs(tool, inputs);
   if (problem) return s.toast(problem, "error");
-  const settings = { resolution: ts.resolution ?? tool.resolutions[0], aspect: ts.aspect ?? tool.defaultAspect };
+  const settings = toolSettings(tool, ts, s.project?.preferences);
   const outputs = tool.outputs * batchSize(tool, inputs);
   const cost = runCost(tool, inputs, settings.resolution);
   if ((s.me?.credits ?? 0) < cost) return s.toast(`Not enough credits — this run needs ${cost}.`, "error");
@@ -177,6 +180,7 @@ export async function saveAdjust() {
 }
 
 export function downloadAsset(a: AssetDTO) {
+  track("asset_downloaded", { media: a.media, kind: a.kind });
   void downloadUrl(a.originalUrl ?? a.url, fileName(a));
 }
 
@@ -246,12 +250,12 @@ export async function copyShareLink(ids: string[]) {
 }
 
 /** Send results to the Canopy canvas as image nodes. */
-export async function openInCanvas(ids: string[]) {
+export async function openInCanvas(ids: string[], canvasId?: string | null) {
   const s = st();
   if (!s.project || !ids.length) return;
   const win = window.open("about:blank", "_blank");
   try {
-    const res = await fetch(`/api/projects/${s.project.id}/canvas`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ assetIds: ids }) });
+    const res = await fetch(`/api/projects/${s.project.id}/canvas`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ assetIds: ids, canvasId: canvasId ?? undefined }) });
     const j = (await res.json()) as { url?: string; error?: string; fallback?: string };
     if (!res.ok || !j.url) throw new Error(j.error ?? "Couldn't open the canvas");
     if (win) win.location.href = j.url;

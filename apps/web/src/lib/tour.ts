@@ -1,6 +1,7 @@
 "use client";
 
 import { api, type RunDTO } from "./api";
+import { track } from "./analytics";
 import { useStudio } from "./store";
 
 export type TourStepDef = {
@@ -40,6 +41,7 @@ export async function enterStep(i: number) {
   const s = st();
   const def = TOUR[i];
   s.set({ tourStep: i, welcome: "tour" });
+  track("tour_step", { step: i, id: def?.id });
   if (def.id === "sketch") {
     if (!ids.sketch) {
       const runs = await step("start");
@@ -114,6 +116,7 @@ export async function autoAdvance(step: number) {
   if (s.welcome !== "tour" || s.tourStep !== step) return;
   const def = TOUR[step];
   if (!def) return;
+  track("tour_auto_advanced", { step, id: def.id });
   if (def.id === "sketch") return tourGenerate("sketch-to-render");
   if (def.id === "recolor") return tourGenerate("garment-recolor");
   if (def.id === "tryon") return tourGenerate("model-try-on");
@@ -140,6 +143,7 @@ export async function startTour() {
 }
 
 export async function endTour(markDone = true) {
+  track(st().tourStep >= TOUR.length - 1 ? "tour_completed" : "tour_exited", { step: st().tourStep });
   st().set({ welcome: "hidden", selectedIds: [] });
   if (markDone) {
     try {

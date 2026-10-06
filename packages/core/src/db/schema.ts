@@ -23,8 +23,56 @@ export const projects = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     lastOpenedAt: timestamp("last_opened_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    /** Dashboard folder (owner's), or null for "All projects". */
+    folderId: text("folder_id"),
+    /** Project preferences: default resolution/aspect per tool kind, description. */
+    preferences: jsonb("preferences").$type<ProjectPrefs>(),
   },
   (t) => [index("projects_owner_idx").on(t.ownerId, t.lastOpenedAt)],
+);
+
+export type ProjectPrefs = { description?: string; imageResolution?: string; videoResolution?: string; aspect?: string; autoDetect?: boolean };
+
+export const folders = pgTable(
+  "folders",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id").notNull(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("folders_owner_idx").on(t.ownerId)],
+);
+
+/** "Share for review": one link for a set of looks; comments/approvals are per asset. */
+export const reviewBoards = pgTable(
+  "review_boards",
+  {
+    id: text("id").primaryKey(),
+    token: text("token").notNull().unique(),
+    projectId: text("project_id").notNull(),
+    createdBy: text("created_by").notNull(),
+    title: text("title").notNull().default(""),
+    assetIds: jsonb("asset_ids").$type<string[]>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (t) => [index("review_boards_project_idx").on(t.projectId, t.createdAt)],
+);
+
+/** "Publish to Explore": community gallery of results people chose to share publicly. */
+export const explorePosts = pgTable(
+  "explore_posts",
+  {
+    id: text("id").primaryKey(),
+    assetId: text("asset_id").notNull().unique(),
+    userId: text("user_id").notNull(),
+    title: text("title").notNull().default(""),
+    author: text("author").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    hiddenAt: timestamp("hidden_at", { withTimezone: true }),
+  },
+  (t) => [index("explore_recent_idx").on(t.createdAt)],
 );
 
 export const projectMembers = pgTable(

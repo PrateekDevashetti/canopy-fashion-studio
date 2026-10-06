@@ -49,7 +49,8 @@ export type RunDTO = {
   optimistic?: boolean;
 };
 
-export type ProjectDTO = { id: string; name: string; ownerId: string; studio: string; createdAt: string; updatedAt: string; lastOpenedAt: string; cover?: string | null; shared?: boolean };
+export type ProjectPrefs = { description?: string; imageResolution?: string; videoResolution?: string; aspect?: string };
+export type ProjectDTO = { id: string; name: string; ownerId: string; studio: string; folderId?: string | null; preferences?: ProjectPrefs; createdAt: string; updatedAt: string; lastOpenedAt: string; cover?: string | null; shared?: boolean };
 export type Role = "owner" | "editor" | "viewer";
 export type Me = { id: string; email: string; name: string; imageUrl: string | null; credits: number; onboarded: boolean; disabledModels: string[]; guest?: boolean };
 export type SegmentDTO = { id: string; label: string; box: [number, number, number, number]; maskKey: string; maskUrl: string; area: number };
@@ -124,7 +125,45 @@ export const api = {
   members: (id: string) => call<{ role: Role; owner: { name: string; email: string }; members: { email: string; role: "editor" | "viewer"; joined: boolean }[] }>(`/api/projects/${id}/members`),
   invite: (id: string, email: string, role: "editor" | "viewer") => post<{ members: { email: string; role: string; joined: boolean }[] }>(`/api/projects/${id}/members`, { email, role }),
   removeMember: (id: string, email: string) => call<{ members: { email: string; role: string; joined: boolean }[] }>(`/api/projects/${id}/members?email=${encodeURIComponent(email)}`, { method: "DELETE" }),
+
+  // Review boards ("Share for review")
+  reviews: (id: string) => call<{ boards: ReviewBoardDTO[] }>(`/api/projects/${id}/reviews`),
+  createReview: (id: string, assetIds: string[], title?: string) => post<{ url: string; token: string }>(`/api/projects/${id}/reviews`, { assetIds, title }),
+  closeReview: (boardId: string) => call<{ ok: true }>(`/api/reviews/${boardId}`, { method: "DELETE" }),
+
+  // Explore
+  explore: (before?: string) => call<{ posts: ExplorePostDTO[] }>(`/api/explore${before ? `?before=${encodeURIComponent(before)}` : ""}`),
+  explorePublished: (assetId: string) => call<{ published: boolean }>(`/api/assets/${assetId}/explore`),
+  publish: (assetId: string, title?: string) => post<{ published: boolean }>(`/api/assets/${assetId}/explore`, { title }),
+  unpublish: (assetId: string) => call<{ published: boolean }>(`/api/assets/${assetId}/explore`, { method: "DELETE" }),
+
+  // Folders & preferences
+  folders: () => call<{ folders: { id: string; name: string }[] }>(`/api/folders`),
+  createFolder: (name: string) => post<{ folder: { id: string; name: string } }>(`/api/folders`, { name }),
+  deleteFolder: (folderId: string) => call<{ ok: true }>(`/api/folders/${folderId}`, { method: "DELETE" }),
+  moveProject: (id: string, folderId: string | null) => call<{ ok: true }>(`/api/projects/${id}/folder`, { method: "PUT", body: JSON.stringify({ folderId }) }),
+  updatePrefs: (id: string, prefs: Record<string, unknown>) => call<{ preferences: Record<string, unknown> }>(`/api/projects/${id}/preferences`, { method: "PATCH", body: JSON.stringify(prefs) }),
+
+  // Canvas picker
+  canvases: (id: string) => call<{ canvases: { id: string; name: string; thumbnailUrl: string | null; updatedAt: string | null }[] }>(`/api/projects/${id}/canvas`),
+
+  // Library sources
+  library: (source: "assets" | "elements" | "history", before?: string) => call<{ assets: AssetDTO[] }>(`/api/library?source=${source}${before ? `&before=${encodeURIComponent(before)}` : ""}`),
+  stock: (q: string, page = 1) => call<{ provider: string; photos: StockPhotoDTO[] }>(`/api/stock?q=${encodeURIComponent(q)}&page=${page}`),
+  importAsset: (id: string, assetId: string) => post<{ asset: AssetDTO }>(`/api/projects/${id}/import`, { assetId }),
+  importUrl: (id: string, url: string, name?: string) => post<{ asset: AssetDTO }>(`/api/projects/${id}/import`, { url, name }),
+
+  // Shopify
+  shopify: () => call<{ connected: boolean; shop?: string; name?: string }>(`/api/shopify`),
+  connectShopify: (shop: string, token: string) => call<{ connected: boolean; shop: string; name: string }>(`/api/shopify`, { method: "PUT", body: JSON.stringify({ shop, token }) }),
+  disconnectShopify: () => call<{ connected: boolean }>(`/api/shopify`, { method: "DELETE" }),
+  exportShopify: (projectId: string, assetIds: string[], title: string, description?: string) =>
+    post<{ productId: string; adminUrl: string; media: number }>(`/api/shopify/export`, { projectId, assetIds, title, description }),
 };
+
+export type ReviewBoardDTO = { id: string; token: string; title: string; assetIds: string[]; createdAt: string; closed: boolean; comments: number; approvals: number; changes: number };
+export type ExplorePostDTO = { id: string; title: string; author: string; createdAt: string; asset: AssetDTO };
+export type StockPhotoDTO = { id: string; title: string; author: string; thumb: string; full: string; link: string; license: string };
 
 /** "Just now", "3m ago", "18h ago", "2d ago". */
 export function timeAgo(iso: string, now = Date.now()) {

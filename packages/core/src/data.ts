@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "./db/client";
 import { assets, creditLedger, projectMembers, projects, reviewComments, runs, users, type AssetRow, type ProjectRow, type RunRow, type UserRow } from "./db/schema";
 import { newId } from "./ids";
+import { capture } from "./analytics";
 import { deleteObject, fileUrl } from "./storage";
 import { runLabel, toolById } from "./tools/registry";
 
@@ -29,6 +30,7 @@ export async function ensureUser(id: string, profile: { email?: string; name?: s
     .returning();
   if (row) {
     await d.insert(creditLedger).values({ id: newId("led"), userId: id, delta: row.credits, reason: "signup" });
+    if (!id.startsWith("guest_")) capture("user_signed_up", id, { credits: row.credits, $set: { email: profile.email, name: profile.name } });
   } else if (profile.email || profile.name) {
     await d
       .update(users)
@@ -182,7 +184,7 @@ export async function deleteProject(projectId: string) {
 }
 
 export function serializeProject(p: ProjectRow) {
-  return { id: p.id, name: p.name, ownerId: p.ownerId, studio: p.studio, createdAt: p.createdAt.toISOString(), updatedAt: p.updatedAt.toISOString(), lastOpenedAt: p.lastOpenedAt.toISOString() };
+  return { id: p.id, name: p.name, ownerId: p.ownerId, studio: p.studio, folderId: p.folderId ?? null, preferences: p.preferences ?? {}, createdAt: p.createdAt.toISOString(), updatedAt: p.updatedAt.toISOString(), lastOpenedAt: p.lastOpenedAt.toISOString() };
 }
 
 /* ---------------- members ---------------- */

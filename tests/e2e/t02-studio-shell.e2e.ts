@@ -46,7 +46,7 @@ test("project menu renames the project", async ({ browser, screen }) => {
   await uploadPublic(p.id, "/studio/tour/render.jpg", "Jacket.jpg");
   await openStudio(browser, p.id);
   await screen.getByRole("button", { name: "Project menu" }).click();
-  await screen.getByRole("button", { name: "Rename" }).click();
+  await screen.getByRole("button", { name: "Rename project" }).click();
   const input = browser.locator("header input, input.field").first();
   await input.fill("SS27 Outerwear");
   await input.press("Enter");

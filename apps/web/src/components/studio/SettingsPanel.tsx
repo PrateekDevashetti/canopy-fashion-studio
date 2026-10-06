@@ -8,6 +8,8 @@ import { useStudio, isPending } from "@/lib/store";
 import { blockedModelsFor, generate } from "@/lib/actions";
 import { cn, Popover, Spinner, Tip } from "@/components/ui";
 import { ImageInput, MaskInput, ColorInput } from "./Inputs";
+import { ReviewPanel, SelectInput, ShopifyPanel } from "./ToolPanels";
+import { toolSettings } from "@/lib/prefs";
 
 function Label({ spec, optional }: { spec: InputSpec; optional?: boolean }) {
   return (
@@ -158,11 +160,11 @@ export function SettingsPanel() {
   const pending = useStudio((s) => s.runs.filter((r) => r.tool === toolId && isPending(r)).length);
   const credits = useStudio((s) => s.me?.credits ?? 0);
   const disabledModels = useStudio((s) => s.me?.disabledModels);
+  const prefs = useStudio((s) => s.project?.preferences);
   const [busy, setBusy] = useState(false);
   const blocked = useMemo(() => blockedModelsFor(toolId), [toolId, disabledModels]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!tool) return null;
-  const resolution = ts?.resolution ?? tool.resolutions[0];
-  const aspect = ts?.aspect ?? tool.defaultAspect;
+  const { resolution, aspect } = toolSettings(tool, ts, prefs);
   const cost = runCost(tool, ts?.inputs ?? {}, resolution);
   const isPrompt = tool.id === "prompt";
 
@@ -179,7 +181,11 @@ export function SettingsPanel() {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-[13px] pt-[14px] pb-4">
-        {isPrompt ? (
+        {tool.panel === "review" ? (
+          <ReviewPanel />
+        ) : tool.panel === "shopify" ? (
+          <ShopifyPanel />
+        ) : isPrompt ? (
           <PromptComposer tool={tool} />
         ) : (
           <div className="flex flex-col">
@@ -190,13 +196,21 @@ export function SettingsPanel() {
                 {spec.kind === "mask" && <MaskInput tool={tool} spec={spec} />}
                 {spec.kind === "text" && <TextInput tool={tool} spec={spec} />}
                 {spec.kind === "color" && <ColorInput tool={tool} spec={spec} />}
+                {spec.kind === "select" && <SelectInput tool={tool} spec={spec} />}
               </div>
             ))}
           </div>
         )}
       </div>
 
+      {!tool.panel && (
       <footer className="mx-[10px] border-t border-line-2 pt-[12px] pb-[10px]">
+        {tool.resolutions[0] === "SVG" ? (
+          <div className="flex items-center justify-between rounded-[9px] border border-line-2 bg-[#1b1b1b] px-2.5 py-2 text-[12px]">
+            <span className="text-dim">Output</span>
+            <span className="text-fg-2">Vector · SVG</span>
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-[10px]">
           <div>
             <div className="label mb-[7px]">
@@ -217,6 +231,7 @@ export function SettingsPanel() {
             <SelectMenu label="Aspect ratio" value={aspect} options={tool.aspects} icon={<AspectIcon aspect={aspect} />} onChange={(v) => setSetting(tool.id, { aspect: v })} />
           </div>
         </div>
+        )}
 
         {blocked.length > 0 && (
           <div className="mt-[14px] rounded-[10px] border border-danger-line bg-danger-bg p-3">
@@ -255,6 +270,7 @@ export function SettingsPanel() {
           </p>
         )}
       </footer>
+      )}
     </aside>
   );
 }

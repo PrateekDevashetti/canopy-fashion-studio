@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { useMemo } from "react";
 import { bindsActive, toolById, type Tool } from "@fashion/core/tools";
+import { track } from "./analytics";
 import { api, ApiError, type AssetDTO, type Me, type ProjectDTO, type Role, type RunDTO, type SegmentDTO } from "./api";
 
 export type Mode = "select" | "lasso" | "brush" | "auto" | "square" | "draw" | "text" | "shapes" | "crop" | "adjust";
@@ -190,6 +191,7 @@ export const useStudio = create<State>((set, get) => ({
 
   openTool: (id) => {
     if (!id) return set({ toolId: null });
+    if (id !== get().toolId) track("tool_opened", { tool: id });
     const prevMode = get().mode;
     set({ toolId: id, mode: prevMode === "crop" || prevMode === "adjust" ? "select" : prevMode });
     bindActiveInputs(id);

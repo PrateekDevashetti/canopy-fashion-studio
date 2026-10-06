@@ -2,6 +2,7 @@ import { and, eq, lt, sql, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import { assets, runs, type AssetMeta, type RunRow } from "../db/schema";
 import { sha256, storeImage } from "../media";
+import { capture } from "../analytics";
 import { getAsset, insertAsset, refundCredits } from "../data";
 import { newId } from "../ids";
 import { extFor, getObjectBuffer, presignGet, putObject } from "../storage";
@@ -588,6 +589,7 @@ export async function executeRun(run: RunRow): Promise<void> {
   const tool = toolById(run.tool);
   const perOutput = run.expected > 0 ? run.cost / run.expected : run.cost;
   let produced = 0;
+  let failure: string | null = null;
   const ctx: Ctx = {
     run,
     settings: run.settings ?? {},
@@ -602,6 +604,7 @@ export async function executeRun(run: RunRow): Promise<void> {
     await db().update(runs).set({ status: "succeeded", finishedAt: new Date(), error: null }).where(eq(runs.id, run.id));
   } catch (e) {
     const message = friendly(e);
+    failure = message.slice(0, 160);
     console.error(`[run ${run.id}] ${run.tool} failed:`, e instanceof Error ? e.message : e);
     await db()
       .update(runs)
@@ -611,6 +614,18 @@ export async function executeRun(run: RunRow): Promise<void> {
   // Refund whatever didn't get made (all of it on failure, the remainder on partial success).
   const missing = Math.max(0, run.expected - produced);
   if (missing > 0) await refundCredits(run.userId, Math.round(perOutput * missing), produced ? "partial refund" : "refund", run.id);
+  capture(produced > 0 ? "run_succeeded" : "run_failed", run.userId, {
+    tool: run.tool,
+    project_id: run.projectId,
+    run_id: run.id,
+    outputs: produced,
+    expected: run.expected,
+    partial: produced > 0 && produced < run.expected,
+    credits_charged: Math.round(perOutput * produced),
+    duration_ms: run.startedAt ? Date.now() - new Date(run.startedAt).getTime() : null,
+    resolution: run.settings?.resolution,
+    error: failure,
+  });
 }
 
 export async function processRun(id: string) {

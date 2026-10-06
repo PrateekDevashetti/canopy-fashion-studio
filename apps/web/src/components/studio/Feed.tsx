@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { api, timeAgo, type AssetDTO, type ProjectDTO, type RunDTO } from "@/lib/api";
 import { useStudio, isPending, useAssets } from "@/lib/store";
+import { ExportDialog, OpenInCanvasDialog, ShareAssetsDialog, ShareForReviewDialog } from "./FeedDialogs";
 import { copyShareLink, deleteAssets, deleteRun, downloadAsset, downloadAssets, openInCanvas, toggleFlag } from "@/lib/actions";
 import { cn, Popover, Spinner, Tip, useConfirm } from "@/components/ui";
 
@@ -253,7 +254,7 @@ const ACTIONS = [
   { id: "review", label: "Share for review", desc: "Collect comments and approvals from collaborators", Icon: MessageSquareText },
   { id: "download", label: "Download", desc: "Original resolution files", Icon: Download },
   { id: "save", label: "Save to Assets", desc: "Keep these in your Assets", Icon: FolderDown },
-  { id: "export", label: "Export", desc: "Send assets to a connected destination", Icon: Upload },
+  { id: "export", label: "Export", desc: "Send assets to Shopify as a draft product", Icon: Upload },
   { id: "delete", label: "Delete", desc: "Remove from the feed — this can't be undone", Icon: Trash2 },
 ] as const;
 
@@ -265,18 +266,14 @@ export function SelectionPanel() {
   const toast = useStudio((s) => s.toast);
   const confirm = useConfirm();
   const list = assets.filter((a) => ids.includes(a.id));
+  const [dialog, setDialog] = useState<null | "canvas" | "share" | "review" | "export">(null);
+  const allMarked = list.length > 0 && list.every((a) => a.marked);
+  const allSaved = list.length > 0 && list.every((a) => a.saved);
   const run = async (id: (typeof ACTIONS)[number]["id"]) => {
     if (id === "mark") return toggleFlag(ids, "marked");
-    if (id === "canvas") return openInCanvas(ids);
-    if (id === "share") return copyShareLink(ids);
-    if (id === "review") {
-      const urls = await Promise.all(ids.map(async (x) => `${(await api.share(x)).url}?review=1`));
-      await navigator.clipboard.writeText(urls.join("\n")).catch(() => {});
-      return toast("Review link copied — reviewers can comment and approve", "ok");
-    }
+    if (id === "canvas" || id === "share" || id === "review" || id === "export") return setDialog(id);
     if (id === "download") return downloadAssets(list, "selection.zip");
     if (id === "save") return toggleFlag(ids, "saved");
-    if (id === "export") return toast("Export destinations (Shopify, Drive, Dropbox) are coming soon.");
     if (id === "delete") {
       if (role !== "owner") return toast("Only the project owner can delete results", "error");
       if (await confirm({ title: `Delete ${ids.length} result${ids.length > 1 ? "s" : ""}?`, body: "They'll be removed from the feed for everyone. This can't be undone.", confirm: "Delete", danger: true })) await deleteAssets(ids);
@@ -301,12 +298,18 @@ export function SelectionPanel() {
           <button key={a.id} className={cn("flex items-start gap-2.5 rounded-[9px] px-2.5 py-2 text-left hover:bg-hover", a.id === "delete" && "text-danger")} onClick={() => void run(a.id)}>
             <a.Icon size={14} className={cn("mt-[2px] shrink-0", a.id === "delete" ? "text-danger" : "text-dim")} />
             <span>
-              <span className={cn("block text-[12.5px]", a.id === "delete" ? "text-danger" : "text-fg")}>{a.label}</span>
+              <span className={cn("block text-[12.5px]", a.id === "delete" ? "text-danger" : "text-fg")}>
+                {a.id === "mark" && allMarked ? "Unmark" : a.id === "save" && allSaved ? "Remove from Assets" : a.label}
+              </span>
               <span className="block text-[11px] leading-[1.35] text-mute">{a.desc}</span>
             </span>
           </button>
         ))}
       </div>
+      <OpenInCanvasDialog open={dialog === "canvas"} onClose={() => setDialog(null)} ids={ids} />
+      <ShareAssetsDialog open={dialog === "share"} onClose={() => setDialog(null)} ids={ids} />
+      <ShareForReviewDialog open={dialog === "review"} onClose={() => setDialog(null)} ids={ids} />
+      <ExportDialog open={dialog === "export"} onClose={() => setDialog(null)} ids={ids} />
     </aside>
   );
 }

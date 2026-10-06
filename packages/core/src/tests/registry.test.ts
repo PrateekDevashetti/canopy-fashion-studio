@@ -11,6 +11,16 @@ test("every section has tools and every tool has unique id/short label", () => {
   for (const s of SOON) assert.ok(!toolById(s.id));
 });
 
+test("every tool's icon and preview card exists on disk", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const pub = path.resolve(import.meta.dirname, "../../../../apps/web/public");
+  for (const t of TOOLS) {
+    assert.ok(fs.existsSync(path.join(pub, t.icon)), `${t.id} icon ${t.icon}`);
+    assert.ok(fs.existsSync(path.join(pub, t.preview)), `${t.id} preview ${t.preview}`);
+  }
+});
+
 test("tools reference known models and assets", () => {
   for (const t of TOOLS) {
     for (const m of t.models) assert.ok(MODELS[m], `${t.id} → ${m}`);

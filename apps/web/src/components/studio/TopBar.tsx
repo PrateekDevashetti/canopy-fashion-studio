@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Crop as CropIcon,
   Download,
-  Ellipsis,
   Info,
   Lasso,
   LayoutGrid,
@@ -24,13 +23,12 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
 import { useStudio, type AnnotateMode, type SelectMode } from "@/lib/store";
-import { downloadAsset, openInCanvas, removeBackground } from "@/lib/actions";
-import { cn, CanopyMark, Popover, Tip, useConfirm } from "@/components/ui";
+import { downloadAsset, removeBackground } from "@/lib/actions";
+import { cn, CanopyMark, Popover, Tip } from "@/components/ui";
 import { ContextBar } from "./ContextBar";
-import { MembersDialog, ShareDialog } from "./Dialogs";
+import { ProjectMenu } from "./ProjectMenu";
+import { OpenInCanvasDialog, ShareAssetsDialog } from "./FeedDialogs";
 import { BgRemoveIcon, FeedIcon, EditorIcon } from "./icons";
 
 const SELECT_MODES: { id: SelectMode; label: string; desc: string; key: string; Icon: typeof Lasso }[] = [
@@ -129,102 +127,6 @@ export function ViewToggle() {
   );
 }
 
-function ProjectMenu() {
-  const project = useStudio((s) => s.project)!;
-  const role = useStudio((s) => s.role);
-  const me = useStudio((s) => s.me);
-  const set = useStudio((s) => s.set);
-  const toast = useStudio((s) => s.toast);
-  const [open, setOpen] = useState(false);
-  const [renaming, setRenaming] = useState(false);
-  const [name, setName] = useState(project.name);
-  const [members, setMembers] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const router = useRouter();
-  const confirm = useConfirm();
-
-  const rename = async () => {
-    setRenaming(false);
-    const n = name.trim();
-    if (!n || n === project.name) return setName(project.name);
-    try {
-      const r = await api.renameProject(project.id, n);
-      set({ project: r.project });
-    } catch (e) {
-      toast((e as Error).message, "error");
-      setName(project.name);
-    }
-  };
-
-  return (
-    <div ref={ref} className="flex items-center gap-1.5">
-      {renaming ? (
-        <input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={rename}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void rename();
-            if (e.key === "Escape") {
-              setName(project.name);
-              setRenaming(false);
-            }
-          }}
-          className="field h-6 w-[180px] rounded-[6px] px-1.5 text-[13px] font-semibold"
-        />
-      ) : (
-        <button className="max-w-[260px] truncate text-[13px] font-semibold text-fg" onDoubleClick={() => role !== "viewer" && setRenaming(true)} onClick={() => setOpen((o) => !o)}>
-          {project.name}
-        </button>
-      )}
-      <button aria-label="Project menu" className="flex h-6 w-6 items-center justify-center rounded-[6px] text-dim hover:bg-hover hover:text-fg" onClick={() => setOpen((o) => !o)}>
-        <Ellipsis size={15} />
-      </button>
-      <Popover open={open} onClose={() => setOpen(false)} anchor={ref} className="w-[220px]">
-        <button className="menu-item" disabled={role === "viewer"} onClick={() => (setOpen(false), setRenaming(true))}>
-          Rename
-        </button>
-        <button
-          className="menu-item"
-          onClick={async () => {
-            setOpen(false);
-            const { project: p } = await api.createProject();
-            router.push(`/studio/${p.id}`);
-          }}
-        >
-          New project
-        </button>
-        <Link className="menu-item" href="/studios">
-          All projects
-        </Link>
-        <button className="menu-item" onClick={() => (setOpen(false), setMembers(true))}>
-          Share &amp; members
-        </button>
-        <Link className="menu-item" href="/settings">
-          Workspace settings
-        </Link>
-        <div className="my-1 h-px bg-line-2" />
-        <div className="px-2.5 py-1.5 text-[11.5px] text-mute">{me?.credits ?? 0} credits left</div>
-        {role === "owner" && (
-          <button
-            className="menu-item text-danger hover:text-danger"
-            onClick={async () => {
-              setOpen(false);
-              if (!(await confirm({ title: "Delete this project?", body: "Every run and result in it will be removed for everyone. This can't be undone.", confirm: "Delete project", danger: true }))) return;
-              await api.deleteProject(project.id);
-              router.push("/studios");
-            }}
-          >
-            Delete project
-          </button>
-        )}
-      </Popover>
-      <MembersDialog open={members} onClose={() => setMembers(false)} />
-    </div>
-  );
-}
-
 /** Signed-in users: credits at a glance + account menu (guests get "Sign in" instead). */
 function CreditsPill() {
   const me = useStudio((s) => s.me);
@@ -305,6 +207,7 @@ export function TopBar() {
   const s = useStudio();
   const active = s.active();
   const [share, setShare] = useState(false);
+  const [canvas, setCanvas] = useState(false);
   const owner = s.role === "owner" ? (s.me?.name ?? "") : "";
   const editing = s.view === "editor" && Boolean(active);
   const isImage = active?.media === "image";
@@ -357,7 +260,7 @@ export function TopBar() {
                     </ToolbarButton>
                   </>
                 )}
-                <ToolbarButton label="Open in Canvas" onClick={() => active && void openInCanvas([active.id])}>
+                <ToolbarButton label="Open in Canvas" onClick={() => setCanvas(true)}>
                   <SquareArrowOutUpRight size={17} strokeWidth={1.7} />
                 </ToolbarButton>
                 <Divider />
@@ -415,7 +318,8 @@ export function TopBar() {
           {!s.me?.guest && <CreditsPill />}
         </div>
       </div>
-      <ShareDialog open={share} onClose={() => setShare(false)} assetIds={active ? [active.id] : []} />
+      <ShareAssetsDialog open={share} onClose={() => setShare(false)} ids={active ? [active.id] : []} />
+      <OpenInCanvasDialog open={canvas} onClose={() => setCanvas(false)} ids={active ? [active.id] : []} />
     </>
   );
 }

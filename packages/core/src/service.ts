@@ -6,6 +6,7 @@ import { newId } from "./ids";
 import { binarizeMask, dims, maskCoverage } from "./engine/imaging";
 import { deleteObject, getObjectBuffer, putObject } from "./storage";
 import { sha256, storeImage } from "./media";
+import { capture } from "./analytics";
 import { adjustImage, annotateImage, cropImage } from "./edit";
 import type { Adjust, CropSpec } from "./adjust";
 import { batchSize, EDITOR_OPS, MODELS, runCost, toolById, validateInputs, type ModelId, type Tool } from "./tools/registry";
@@ -121,6 +122,7 @@ export async function createRun(userId: string, projectId: string, toolId: strin
     throw e;
   }
   await db().update(projects).set({ updatedAt: new Date(), lastOpenedAt: new Date() }).where(eq(projects.id, projectId));
+  capture("run_created", userId, { tool: tool.id, project_id: projectId, run_id: id, credits: cost, outputs: expected, resolution, aspect });
   return (await runWithOutputs(id))!;
 }
 
@@ -154,6 +156,7 @@ export async function uploadImage(userId: string, projectId: string, file: { buf
   }
   const runId = await instantRun(userId, projectId, "upload", groupRunId);
   const name = file.name.replace(/\.[a-z0-9]+$/i, "").slice(0, 120) || "Upload";
+  capture("asset_uploaded", userId, { project_id: projectId, bytes: stored.bytes, format: stored.meta.format, width: stored.width, height: stored.height });
   return insertAsset({ id, projectId, userId, runId, kind: "upload", media: "image", name, ...stored });
 }
 
