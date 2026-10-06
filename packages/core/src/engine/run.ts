@@ -4,11 +4,12 @@ import { assets, runs, type AssetMeta, type RunRow } from "../db/schema";
 import { sha256, storeImage } from "../media";
 import { getAsset, insertAsset, refundCredits } from "../data";
 import { newId } from "../ids";
-import { extFor, getObjectBuffer, putObject } from "../storage";
+import { extFor, getObjectBuffer, presignGet, putObject } from "../storage";
 import { EDITOR_OPS, toolById } from "../tools/registry";
-import { chromaKey, compositeMasked, cropBox, cropToMask, dims, highlightRegion, matchGarmentColor, nearestAspect, outsideDrift, padMask, padToAspect, toDataUri, unpad } from "./imaging";
+import { applyMatte, binarizeMask, chromaKey, compositeMasked, cropBox, cropToMask, dims, highlightRegion, maskCoverage, matchGarmentColor, nearestAspect, outsideDrift, padMask, padToAspect, toDataUri, unpad } from "./imaging";
 import { detectGarments, locateSubject } from "./detect";
-import { download, falRun, falSubmit, falWait, openrouterImage, ProviderError, providerDown, tripIfFatal, type QueueRef } from "./providers";
+import { traceColor, traceLineArt } from "./vector";
+import { download, falRun, falSubmit, falWait, openrouterImage, openrouterVideoSubmit, openrouterVideoWait, ProviderError, providerDown, tripIfFatal, type OrVideoInput, type QueueRef } from "./providers";
 import { ANGLES, P, SHOOT_SHOTS } from "./prompts";
 import sharp from "sharp";
 
@@ -29,7 +30,8 @@ async function loadImage(projectId: string, assetId: string): Promise<{ buf: Buf
   const a = await getAsset(assetId);
   if (!a || a.projectId !== projectId) throw new ProviderError("An input image is missing — it may have been deleted.", 400);
   // Videos contribute their poster frame.
-  const key = a.media === "video" ? a.posterKey : a.storageKey;
+  // Videos contribute their poster; vector masters their raster preview.
+  const key = a.media === "video" ? a.posterKey : a.mime === "image/svg+xml" ? (a.previewKey ?? a.storageKey) : a.storageKey;
   if (!key) throw new ProviderError("Video inputs need a poster frame.", 400);
   const buf = await getObjectBuffer(key);
   if (!buf) throw new ProviderError("Couldn't read an input image from storage.", 500, true);
@@ -90,7 +92,7 @@ const seedream: Step = {
 
 const PRO: Step[] = [falNB("fal-ai/nano-banana-pro", "fal-ai/nano-banana-pro/edit"), orNB("google/gemini-3-pro-image")];
 const FAST: Step[] = [falNB(NB2, NB2_EDIT), orNB("google/gemini-3.1-flash-image"), falNB(NB_FALLBACK, NB_FALLBACK_EDIT, false)];
-const CHAINS: Record<Tier, Step[]> = { pro: [...PRO, ...FAST], fast: FAST, seedream: [seedream, ...PRO, ...FAST] };
+const CHAINS: Record<Tier, Step[]> = { pro: [...PRO, ...FAST], fast: FAST, seedream: [seedream, orNB("bytedance-seed/seedream-5-0-pro"), ...PRO, ...FAST] };
 
 export async function generateImages(prompt: string, images: Buffer[], settings: Settings, n = 1, tier: Tier = "fast"): Promise<Buffer[]> {
   const uris = await Promise.all(images.map((b) => toDataUri(b)));
@@ -139,7 +141,7 @@ async function tryOn(model: Buffer, garment: Buffer, settings: Settings, fallbac
   return one(fallbackPrompt, [model, garment], settings, "pro");
 }
 
-async function removeBackground(buf: Buffer): Promise<Buffer> {
+export async function removeBackground(buf: Buffer): Promise<Buffer> {
   if (!providerDown("fal")) {
     try {
       const out = await falRun<{ image: { url: string } }>("fal-ai/birefnet/v2", { image_url: await toDataUri(buf, 2048, true), output_format: "png", refine_foreground: true });
@@ -149,8 +151,23 @@ async function removeBackground(buf: Buffer): Promise<Buffer> {
       console.warn("[engine] birefnet failed, using Gemini chroma-key fallback:", (e as Error).message.slice(0, 120));
     }
   }
-  // Fallback: have Gemini isolate the subject on pure chroma green (same framing), then key it out.
   const { width, height } = await dims(buf);
+  // Fallback 1: a black/white matte from Gemini applied to the ORIGINAL pixels (subject untouched).
+  try {
+    const { buf: padded, pad } = await padToAspect(buf);
+    const [m] = await openrouterImage(
+      "Create a precise alpha matte of the main subject (the person and everything they wear and hold, or the product): output the exact same framing and size, pure white (#FFFFFF) where the subject is and pure black (#000000) for the background. Follow hair and fabric edges closely. No gray backgrounds, no shadows, no other content.",
+      [await toDataUri(padded)],
+      { aspect: pad.aspect },
+    );
+    const matte = await unpad(m, pad);
+    const cov = await maskCoverage(await binarizeMask(matte, { width, height }));
+    if (cov > 0.02 && cov < 0.97) return applyMatte(buf, matte);
+    console.warn(`[engine] matte coverage ${cov.toFixed(3)} looks wrong, trying chroma key`);
+  } catch (e) {
+    console.warn("[engine] matte fallback failed:", (e as Error).message.slice(0, 120));
+  }
+  // Fallback 2: have Gemini isolate the subject on pure chroma green (same framing), then key it out.
   const [green] = await openrouterImage(
     "Keep the main subject exactly as it is (same position, scale, framing, shape, colors and details) and replace the entire background with a perfectly flat pure chroma-key green (#00FF00). Do not crop, zoom or move the subject. No shadows on the background, no green spill on the subject.",
     [await toDataUri(buf)],
@@ -159,16 +176,38 @@ async function removeBackground(buf: Buffer): Promise<Buffer> {
   return chromaKey(green, buf);
 }
 
-async function video(run: RunRow, endpoint: string, input: Record<string, unknown>): Promise<Buffer> {
-  // Resume a job a previous worker already submitted rather than paying twice.
-  let ref = run.providerRef?.queue as QueueRef | undefined;
-  if (!ref || ref.endpoint !== endpoint) {
-    ref = await falSubmit(endpoint, input);
-    await db().update(runs).set({ providerRef: { ...run.providerRef, queue: ref } }).where(eq(runs.id, run.id));
+/** Resume a job a previous worker already submitted rather than paying twice. */
+async function resumable(run: RunRow, endpoint: string, submit: () => Promise<QueueRef>): Promise<QueueRef> {
+  const prev = run.providerRef?.queue as QueueRef | undefined;
+  if (prev && prev.endpoint === endpoint) return prev;
+  const ref = await submit();
+  await db().update(runs).set({ providerRef: { ...run.providerRef, queue: ref } }).where(eq(runs.id, run.id));
+  run.providerRef = { ...run.providerRef, queue: ref };
+  return ref;
+}
+
+async function falVideo(run: RunRow, endpoint: string, input: Record<string, unknown>): Promise<Buffer> {
+  if (providerDown("fal")) throw new ProviderError("fal is unavailable", 503);
+  try {
+    const ref = await resumable(run, endpoint, () => falSubmit(endpoint, input));
+    const out = await falWait<{ video?: { url: string } }>(ref);
+    if (!out.video?.url) throw new ProviderError("The video model returned no video.", 502);
+    return (await download(out.video.url)).buf;
+  } catch (e) {
+    tripIfFatal("fal", e);
+    throw e;
   }
-  const out = await falWait<{ video?: { url: string } }>(ref);
-  if (!out.video?.url) throw new ProviderError("The video model returned no video.", 502);
-  return (await download(out.video.url)).buf;
+}
+
+async function orVideo(run: RunRow, model: string, v: OrVideoInput): Promise<Buffer> {
+  if (providerDown("openrouter")) throw new ProviderError("OpenRouter is unavailable", 503);
+  try {
+    const ref = await resumable(run, `openrouter:${model}`, () => openrouterVideoSubmit(model, v));
+    return await openrouterVideoWait(ref);
+  } catch (e) {
+    tripIfFatal("openrouter", e);
+    throw e;
+  }
 }
 
 /* ---------------- consistency ---------------- */
@@ -221,6 +260,44 @@ async function identityRefs(buf: Buffer): Promise<{ bufs: Buffer[]; flags: { fac
   // An outfit box covering most of the frame adds nothing over the main image.
   const outfit = o && (o[2] - o[0]) * (o[3] - o[1]) < 0.6 ? await cropBox(buf, o, 0.05, 1024).catch(() => null) : null;
   return { bufs: [face, outfit].filter((b): b is Buffer => !!b), flags: { face: !!face, outfit: !!outfit } };
+}
+
+/**
+ * Make a print tile repeat seamlessly: shift it by half (so the tile's own edges meet in the
+ * middle), repaint only that cross-shaped seam band, and keep the shifted tile — its outer edges
+ * are former interior pixels, so it tiles perfectly by construction.
+ */
+async function makeSeamless(tile: Buffer, settings: Settings): Promise<{ buf: Buffer; tileScore: number }> {
+  const { width: W, height: H } = await dims(tile);
+  const hw = Math.floor(W / 2);
+  const hh = Math.floor(H / 2);
+  const q = (left: number, top: number, w: number, h: number) => sharp(tile).extract({ left, top, width: w, height: h }).toBuffer();
+  const [tl, tr, bl, br] = await Promise.all([q(0, 0, hw, hh), q(hw, 0, W - hw, hh), q(0, hh, hw, H - hh), q(hw, hh, W - hw, H - hh)]);
+  const shifted = await sharp({ create: { width: W, height: H, channels: 3, background: "#fff" } })
+    .composite([
+      { input: br, left: 0, top: 0 },
+      { input: bl, left: W - hw, top: 0 },
+      { input: tr, left: 0, top: H - hh },
+      { input: tl, left: W - hw, top: H - hh },
+    ])
+    .png()
+    .toBuffer();
+  const band = Math.round(Math.min(W, H) * 0.06);
+  const cx = W - hw;
+  const cy = H - hh;
+  const mask = await sharp(
+    Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="100%" height="100%" fill="black"/><rect x="${cx - band}" y="0" width="${band * 2}" height="${H}" fill="white"/><rect x="0" y="${cy - band}" width="${W}" height="${band * 2}" fill="white"/></svg>`),
+  )
+    .png()
+    .toBuffer();
+  const fixed = (await inPlaceEdit({ prompt: P.printSeam(), base: shifted, mask, settings: { ...settings, aspect: "1:1" }, tier: "pro", dilate: 2 })).buf;
+  // Tile score: how well opposite edges match (1 = perfect).
+  const px = await sharp(fixed).removeAlpha().toColourspace("srgb").raw().toBuffer();
+  let diff = 0;
+  for (let y = 0; y < H; y++) for (let c = 0; c < 3; c++) diff += Math.abs(px[(y * W) * 3 + c] - px[(y * W + W - 1) * 3 + c]);
+  for (let x = 0; x < W; x++) for (let c = 0; c < 3; c++) diff += Math.abs(px[x * 3 + c] - px[((H - 1) * W + x) * 3 + c]);
+  const tileScore = Math.round((1 - diff / ((W + H) * 3 * 255)) * 1000) / 1000;
+  return { buf: fixed, tileScore };
 }
 
 /* ---------------- tools ---------------- */
@@ -338,21 +415,28 @@ async function execute(ctx: Ctx) {
     }
     case "garment-360":
     case "model-360": {
-      const key = run.tool === "garment-360" ? "garment" : "look";
-      const [frontImg] = await imgs(key);
-      const [backImg] = run.tool === "garment-360" ? await imgs("back") : [];
-      const front = { ...frontImg, uri: await toDataUri(frontImg.buf) };
-      const back = backImg ? { uri: await toDataUri(backImg.buf) } : null;
+      const garment = run.tool === "garment-360";
+      const [frontImg] = await imgs(garment ? "garment" : "look");
+      const [backImg] = garment ? await imgs("back") : [];
+      const { width: fw, height: fh } = await dims(frontImg.buf);
+      const portrait = fh >= fw;
       const res = settings.resolution === "720p" ? "720p" : "1080p";
-      const aspect = ["16:9", "9:16"].includes(settings.aspect ?? "") ? settings.aspect : "auto";
-      const veo = (endpoint: string) =>
-        video(run, endpoint, { prompt: run.tool === "garment-360" ? P.garment360(false) : P.model360(), image_url: front.uri, aspect_ratio: aspect, resolution: res, duration: "8s", generate_audio: false });
-      const kling = (end?: string) => video(run, "fal-ai/kling-video/v3/pro/image-to-video", { prompt: run.tool === "garment-360" ? P.garment360(Boolean(end)) : P.model360(), start_image_url: front.uri, ...(end ? { end_image_url: end } : {}), duration: "10", generate_audio: false });
-      const tries: (() => Promise<Buffer>)[] = back
-        ? [() => kling(back.uri), () => veo("fal-ai/veo3.1/image-to-video")]
-        : run.tool === "garment-360"
-          ? [() => veo("fal-ai/veo3.1/image-to-video"), () => veo("fal-ai/veo3.1/fast/image-to-video"), () => kling()]
-          : [() => veo("fal-ai/veo3.1/fast/image-to-video"), () => kling()];
+      const aspect = ["16:9", "9:16"].includes(settings.aspect ?? "") ? settings.aspect! : portrait ? "9:16" : "16:9";
+      const prompt = garment ? P.garment360(Boolean(backImg)) : P.model360();
+      // fal takes data URIs; OpenRouter needs fetchable URLs, so hand it short-lived presigned storage links.
+      const frontUri = await toDataUri(frontImg.buf);
+      const backUri = backImg ? await toDataUri(backImg.buf) : null;
+      const frontUrl = presignGet(frontImg.key, 3 * 3600) ?? frontUri;
+      const backUrl = backImg ? (presignGet(backImg.key, 3 * 3600) ?? backUri) : null;
+      const falVeo = (endpoint: string) => () => falVideo(run, endpoint, { prompt, image_url: frontUri, aspect_ratio: aspect, resolution: res, duration: "8s", generate_audio: false });
+      const falKling = () => falVideo(run, "fal-ai/kling-video/v3/pro/image-to-video", { prompt, start_image_url: frontUri, ...(backUri ? { end_image_url: backUri } : {}), duration: "10", generate_audio: false });
+      const or = (model: string, o: { duration: number; resolution: string; aspect?: string; last?: boolean }) => () =>
+        orVideo(run, model, { prompt, firstFrameUrl: frontUrl, lastFrameUrl: o.last ? backUrl : null, duration: o.duration, resolution: o.resolution, aspect: o.aspect ?? aspect });
+      const tries: (() => Promise<Buffer>)[] = backImg
+        ? [falKling, or("kwaivgi/kling-v3.0-pro", { duration: 10, resolution: "720p", last: true }), or("google/veo-3.1", { duration: 8, resolution: res, last: true }), or("bytedance/seedance-2.5", { duration: 10, resolution: "720p", last: true })]
+        : garment
+          ? [falVeo("fal-ai/veo3.1/image-to-video"), or("google/veo-3.1-fast", { duration: 8, resolution: res }), or("kwaivgi/kling-v3.0-pro", { duration: 10, resolution: "720p" }), or("bytedance/seedance-2.5", { duration: 10, resolution: "720p" })]
+          : [falVeo("fal-ai/veo3.1/fast/image-to-video"), or("google/veo-3.1-fast", { duration: 8, resolution: res }), or("kwaivgi/kling-v3.0-pro", { duration: 10, resolution: "720p" }), or("bytedance/seedance-2.5", { duration: 10, resolution: "720p" })];
       let buf: Buffer | null = null;
       let lastErr: unknown = null;
       for (const t of tries) {
@@ -361,14 +445,71 @@ async function execute(ctx: Ctx) {
           break;
         } catch (e) {
           lastErr = e;
-          if (isPolicy(e) || providerDown("fal")) break;
-          tripIfFatal("fal", e);
+          if (isPolicy(e)) break;
+          console.warn(`[engine] video step failed, trying next:`, (e as Error).message.slice(0, 160));
+          // Forget the failed job so the next step submits fresh.
           await db().update(runs).set({ providerRef: {} }).where(eq(runs.id, run.id));
           run.providerRef = {};
         }
       }
       if (!buf) throw lastErr ?? new ProviderError("Video generation failed", 502);
-      return emit({ buf, mime: "video/mp4", name: run.tool === "garment-360" ? "360 garment video" : "360 model video", posterKey: front.key, parentId: front.id });
+      return emit({ buf, mime: "video/mp4", name: garment ? "360 garment video" : "360 model video", posterKey: frontImg.key, parentId: frontImg.id });
+    }
+    case "sketch-to-vector":
+    case "garment-to-vector": {
+      const sketchTool = run.tool === "sketch-to-vector";
+      const items = await imgs(sketchTool ? "sketch" : "garment");
+      const style = (text("style") || (sketchTool ? "line" : "flat")) as "line" | "flat";
+      const prompt = sketchTool ? (style === "flat" ? P.vectorFlat() : P.vectorLine()) : P.garmentFlat(style);
+      await Promise.all(
+        items.map(async (it) => {
+          // The model draws a clean, faithful drawing; tracing turns exactly those pixels into SVG paths.
+          const clean = await one(prompt, [it.buf], { ...settings, resolution: "2K", aspect: "Auto" }, "pro");
+          const svg = style === "flat" ? await traceColor(clean) : await traceLineArt(clean);
+          await emit({ buf: Buffer.from(svg, "utf8"), mime: "image/svg+xml", name: sketchTool ? "Vector" : "Vector flat", parentId: it.id });
+        }),
+      );
+      return;
+    }
+    case "moodboard-maker": {
+      const refs = await imgs("references");
+      await Promise.all([0, 1].map(async (v) => emit(png(await one(P.moodboard(text("direction"), v), refs.map((r) => r.buf), settings, "seedream"), "Moodboard"))));
+      return;
+    }
+    case "print-pattern": {
+      const [ref] = await imgs("reference");
+      await Promise.all(
+        [0, 1].map(async (v) => {
+          const tile = await one(P.printTile(text("object"), text("theme"), v, !!ref), ref ? [ref.buf] : [], { ...settings, aspect: "1:1" }, "pro");
+          const seamless = await makeSeamless(tile, settings);
+          await emit(png(seamless.buf, "Print pattern"));
+        }),
+      );
+      return;
+    }
+    case "trim-patches": {
+      const [g] = await imgs("garment");
+      const [ref] = await imgs("reference");
+      const mask = await loadMask(pid, i.mask);
+      const r = await inPlaceEdit({ prompt: P.trim(text("trim"), !!mask, !!ref), base: g.buf, mask, extra: ref ? [ref.buf] : [], settings, tier: "pro", dilate: 6 });
+      return emit(png(r.buf, "Trim added", g.id, r.meta));
+    }
+    case "pdp-shots": {
+      const garments = await imgs("garment");
+      const [model] = await imgs("model");
+      const bg = (["white", "grey", "warm"].includes(text("background")) ? text("background") : "white") as "white" | "grey" | "warm";
+      const id = model ? await identityRefs(model.buf) : null;
+      await Promise.all(
+        garments.flatMap((g) =>
+          [0, 1, 2, 3].map(async (shot) => {
+            const onModel = shot === 3;
+            const refs = onModel && model ? [g.buf, model.buf, ...(id?.bufs ?? [])] : [g.buf];
+            const out = await one(P.pdp(shot, bg, onModel && !!model), refs, settings, "pro");
+            await emit(png(out, ["Front packshot", "Three-quarter", "Detail", "On-model"][shot], g.id));
+          }),
+        ),
+      );
+      return;
     }
     case "region-edit": {
       const [img] = await imgs("image");

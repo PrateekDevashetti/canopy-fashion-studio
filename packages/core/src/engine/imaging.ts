@@ -21,6 +21,32 @@ export async function toDataUri(buf: Buffer, max = 2048, keepAlpha = false): Pro
   return `data:image/jpeg;base64,${out.toString("base64")}`;
 }
 
+/**
+ * Pixels as interleaved sRGB with exactly 3 or 4 channels, whatever the source (greyscale,
+ * grey+alpha, palette, CMYK). Model outputs vary in format; assuming 3 channels on a grey+alpha
+ * PNG misaligns every row (the "scan-line" artifact).
+ */
+export async function rawRGB(img: sharp.Sharp, channels: 3 | 4 = 3): Promise<{ data: Buffer; width: number; height: number }> {
+  // Read whatever sharp produces, then normalise the layout ourselves: some pipelines (greyscale,
+  // threshold) pin the output to 1 band no matter what colourspace is requested.
+  const { data: src, info } = await img.toColourspace("srgb").raw().toBuffer({ resolveWithObject: true });
+  const n = info.width * info.height;
+  const c = info.channels;
+  if (c === channels) return { data: src, width: info.width, height: info.height };
+  const out = Buffer.alloc(n * channels);
+  for (let i = 0; i < n; i++) {
+    const s = i * c;
+    const d = i * channels;
+    const [r, g, b] = c >= 3 ? [src[s], src[s + 1], src[s + 2]] : [src[s], src[s], src[s]];
+    const a = c === 4 ? src[s + 3] : c === 2 ? src[s + 1] : 255;
+    out[d] = r;
+    out[d + 1] = g;
+    out[d + 2] = b;
+    if (channels === 4) out[d + 3] = a;
+  }
+  return { data: out, width: info.width, height: info.height };
+}
+
 /** Binary mask (white = selected) resized to the target, as a single-channel raw buffer. */
 async function maskAlpha(mask: Buffer, size: Dims, featherPx: number, dilatePx = 0): Promise<Buffer> {
   // Stay in single-channel raw the whole way: round-tripping through an encoded image can come
@@ -40,7 +66,7 @@ async function maskAlpha(mask: Buffer, size: Dims, featherPx: number, dilatePx =
 export async function compositeMasked(original: Buffer, edited: Buffer, mask: Buffer, opts: { feather?: number; dilate?: number } = {}): Promise<Buffer> {
   const size = await dims(original);
   const base = sharp(original).rotate().resize(size.width, size.height).removeAlpha().toColourspace("srgb");
-  const top = await sharp(edited).resize(size.width, size.height, { fit: "fill" }).removeAlpha().toColourspace("srgb").raw().toBuffer();
+  const top = (await rawRGB(sharp(edited).resize(size.width, size.height, { fit: "fill" }), 3)).data;
   const alpha = await maskAlpha(mask, size, opts.feather ?? Math.max(2, Math.round(Math.min(size.width, size.height) / 300)), opts.dilate ?? 0);
   const rgba = Buffer.alloc(size.width * size.height * 4);
   for (let i = 0, j = 0; i < alpha.length; i++, j += 3) {
@@ -129,8 +155,8 @@ export async function chromaKey(green: Buffer, original: Buffer): Promise<Buffer
   // If the model reframed the image, the original's pixels no longer line up — key the model's own.
   const aligned = Math.abs(Math.log(gd.width / gd.height / (od.width / od.height))) < 0.02;
   const size = aligned ? od : gd;
-  const g = await sharp(green).resize(size.width, size.height, { fit: "fill" }).removeAlpha().raw().toBuffer();
-  const o = aligned ? await sharp(original).rotate().resize(size.width, size.height).removeAlpha().raw().toBuffer() : g;
+  const g = (await rawRGB(sharp(green).resize(size.width, size.height, { fit: "fill" }), 3)).data;
+  const o = aligned ? (await rawRGB(sharp(original).rotate().resize(size.width, size.height), 3)).data : g;
   const alpha = Buffer.alloc(size.width * size.height);
   for (let i = 0, j = 0; i < alpha.length; i++, j += 3) {
     const r = g[j], gg = g[j + 1], b = g[j + 2];
@@ -276,7 +302,7 @@ const hexRgb = (hex: string): [number, number, number] => [1, 3, 5].map((i) => p
  */
 export async function matchGarmentColor(buf: Buffer, mask: Buffer, hex: string): Promise<{ buf: Buffer; deltaBefore: number; deltaAfter: number }> {
   const { width, height } = await dims(buf);
-  const rgb = await sharp(buf).rotate().removeAlpha().raw().toBuffer();
+  const rgb = (await rawRGB(sharp(buf).rotate(), 3)).data;
   const w = await maskAlpha(mask, { width, height }, 1.5);
   const target = rgbToLab(...hexRgb(hex));
   // Weighted mean of the selected (fully-inside) pixels.
@@ -318,6 +344,25 @@ export async function matchGarmentColor(buf: Buffer, mask: Buffer, hex: string):
   }
   const deltaAfter = on ? de([oL / on, oa / on, ob / on], target) : deltaBefore;
   return { buf: await sharp(out, { raw: { width, height, channels: 3 } }).png().toBuffer(), deltaBefore, deltaAfter };
+}
+
+/** Cut out the original using a (soft) white-on-black matte: original pixels, matte as alpha. */
+export async function applyMatte(original: Buffer, matte: Buffer): Promise<Buffer> {
+  const size = await dims(original);
+  const rgb = (await rawRGB(sharp(original).rotate(), 3)).data;
+  // Clean the matte: crush near-black/near-white, keep a soft 1–2px edge.
+  const a = await maskAlpha(matte, size, 0);
+  const alpha = Buffer.alloc(a.length);
+  for (let i = 0; i < a.length; i++) alpha[i] = a[i] < 40 ? 0 : a[i] > 215 ? 255 : Math.round(((a[i] - 40) / 175) * 255);
+  const soft = await sharp(alpha, { raw: { width: size.width, height: size.height, channels: 1 } }).blur(0.6).extractChannel(0).raw().toBuffer();
+  const rgba = Buffer.alloc(size.width * size.height * 4);
+  for (let i = 0, j = 0; i < soft.length; i++, j += 3) {
+    rgba[i * 4] = rgb[j];
+    rgba[i * 4 + 1] = rgb[j + 1];
+    rgba[i * 4 + 2] = rgb[j + 2];
+    rgba[i * 4 + 3] = soft[i];
+  }
+  return sharp(rgba, { raw: { width: size.width, height: size.height, channels: 4 } }).png().toBuffer();
 }
 
 export async function toPng(buf: Buffer): Promise<Buffer> {

@@ -161,7 +161,7 @@ export const FAQ: { q: string; a: string[] }[] = [
   {
     q: "How is Fashion Studio priced, and is it available in all plans?",
     a: [
-      "Fashion Studio runs on Canopy credits. Every new account starts with 200 free credits, and every tool shows its credit cost next to the Generate button before you run it — a quick recolor uses far fewer credits than a full campaign video. Failed generations are refunded automatically. For team plans and higher volumes, talk to us.",
+      "Fashion Studio runs on Canopy credits. Every new account starts with 20 free credits, and every tool shows its credit cost next to the Generate button before you run it — a quick recolor uses far fewer credits than a full campaign video. Failed generations are refunded automatically. For team plans and higher volumes, talk to us.",
     ],
   },
 ];

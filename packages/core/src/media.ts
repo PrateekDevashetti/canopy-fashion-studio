@@ -51,8 +51,48 @@ export async function makePreview(img: Pick<Inspected, "buf" | "width" | "height
     .toBuffer();
 }
 
+const isSvg = (buf: Buffer) => /^\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(buf.subarray(0, 2048).toString("utf8"));
+
+/**
+ * Remove anything executable from an SVG: scripts, event handlers, foreign objects and external
+ * references. Served SVGs also get a sandboxing CSP, so this is defence in depth.
+ */
+export function sanitizeSvg(svg: string): string {
+  return svg
+    .replace(/<script[\s\S]*?<\/script\s*>/gi, "")
+    .replace(/<script[^>]*\/>/gi, "")
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, "")
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s(xlink:)?href\s*=\s*("|')\s*(?!#|data:image\/)[^"']*\2/gi, "")
+    .replace(/javascript:/gi, "");
+}
+
+async function storeSvg(projectId: string, assetId: string, input: Buffer, opts: { originalName?: string }) {
+  const svg = Buffer.from(sanitizeSvg(input.toString("utf8")), "utf8");
+  const m = await sharp(svg, { limitInputPixels: MAX_PIXELS }).metadata();
+  if (!m.width || !m.height) throw new Error("unreadable image");
+  const scale = Math.min(1, PREVIEW_EDGE / Math.max(m.width, m.height));
+  const preview = await sharp(svg, { density: 72 * Math.max(1, 1 / scale) })
+    .resize({ width: PREVIEW_EDGE, height: PREVIEW_EDGE, fit: "inside" })
+    .webp({ quality: 90, alphaQuality: 95 })
+    .toBuffer();
+  const storageKey = `p/${projectId}/${assetId}.svg`;
+  const previewKey = `p/${projectId}/previews/${assetId}.webp`;
+  await Promise.all([putObject(storageKey, svg), putObject(previewKey, preview)]);
+  return {
+    storageKey,
+    previewKey,
+    mime: "image/svg+xml",
+    width: m.width,
+    height: m.height,
+    bytes: svg.length,
+    meta: { sha256: sha256(svg), format: "svg", ...(opts.originalName ? { originalName: opts.originalName } : {}) },
+  };
+}
+
 /** Store a master image (as-is) and its preview. Returns the storage fields for an asset row. */
 export async function storeImage(projectId: string, assetId: string, input: Buffer, opts: { originalName?: string } = {}) {
+  if (isSvg(input)) return storeSvg(projectId, assetId, input, opts);
   const img = await inspectImage(input);
   const storageKey = `p/${projectId}/${assetId}.${EXT[img.mime] ?? "png"}`;
   const preview = await makePreview(img);

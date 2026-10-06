@@ -58,6 +58,10 @@
     from { opacity: 0; transform: translateY(18px); }
     to { opacity: 1; transform: none; }
   }
+  @keyframes tour-countdown {
+    from { width: 0%; }
+    to { width: 100%; }
+  }
 }
 
 :root {

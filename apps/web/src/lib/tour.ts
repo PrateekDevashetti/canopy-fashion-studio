@@ -102,6 +102,38 @@ export async function tourGenerate(toolId: string) {
   }
 }
 
+/** How long a step waits for the user before the tour does it for them. */
+export const AUTO_ADVANCE_MS = 7000;
+
+/**
+ * Perform the current step's action on the user's behalf (they didn't click within
+ * AUTO_ADVANCE_MS): generate, pick the jacket, or switch to the feed. The last step waits.
+ */
+export async function autoAdvance(step: number) {
+  const s = st();
+  if (s.welcome !== "tour" || s.tourStep !== step) return;
+  const def = TOUR[step];
+  if (!def) return;
+  if (def.id === "sketch") return tourGenerate("sketch-to-render");
+  if (def.id === "recolor") return tourGenerate("garment-recolor");
+  if (def.id === "tryon") return tourGenerate("model-try-on");
+  if (def.id === "review") return st().set({ view: "feed" });
+  if (def.id === "select" && ids.render) {
+    try {
+      const { segments } = await api.detect(ids.render);
+      const main = [...segments].sort((a, b) => b.area - a.area)[0];
+      if (!main || st().tourStep !== step) return;
+      st().setInput("garment-recolor", "mask", main.maskKey);
+      st().setInput("garment-recolor", "maskLabel", main.label);
+      st().set({ selection: { kind: "segment", segment: main } });
+      return enterStep(2);
+    } catch {
+      // Detection unavailable — skip straight to the recolor step without a selection.
+      return enterStep(2);
+    }
+  }
+}
+
 export async function startTour() {
   st().set({ welcome: "tour", tourStep: 0 });
   await enterStep(0);

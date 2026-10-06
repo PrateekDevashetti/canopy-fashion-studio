@@ -5,7 +5,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().default(""),
   name: text("name").notNull().default(""),
   imageUrl: text("image_url"),
-  credits: integer("credits").notNull().default(200),
+  credits: integer("credits").notNull().default(20),
   onboarded: boolean("onboarded").notNull().default(false),
   /** Workspace settings: { disabledModels: ModelId[] } */
   settings: jsonb("settings").$type<{ disabledModels?: string[] }>().notNull().default({}),

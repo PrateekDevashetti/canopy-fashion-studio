@@ -34,6 +34,7 @@ export const MIME: Record<string, string> = {
   webp: "image/webp",
   gif: "image/gif",
   avif: "image/avif",
+  svg: "image/svg+xml",
   mp4: "video/mp4",
   webm: "video/webm",
   mov: "video/quicktime",

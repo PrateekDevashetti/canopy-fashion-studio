@@ -59,8 +59,8 @@ export const P = {
 
   flatlay: () =>
     [
-      "Turn this garment into a professional flatlay: laid perfectly flat and neatly arranged, shot straight top-down on a seamless white surface with soft even light and a faint shadow.",
-      "Sleeves and legs arranged symmetrically. No person, hanger or mannequin.",
+      "Turn this garment into a professional e-commerce flatlay photo: the garment lies completely flat on a table — no body, no volume, no inflated 3D shape — photographed from directly above (orthographic top-down view) on a seamless off-white surface with soft even light and only a faint contact shadow.",
+      "Front panel facing the camera, collar folded naturally, sleeves laid flat out to the sides (or neatly folded in), hem straight, symmetrical arrangement, gentle natural fabric creases. No person, hanger or mannequin.",
       KEEP,
       "Keep the exact colors.",
     ].join(" "),
@@ -144,6 +144,85 @@ export const P = {
       "Return the full first image with that change applied. Keep everything outside the highlighted region identical, and blend the edit seamlessly with matching lighting, perspective and texture. Do not include the magenta highlight in the result.",
       FRAME,
     ].join(" "),
+
+  /* ----- vector (the model draws a clean, faithful version; tracing turns it into SVG) ----- */
+
+  vectorLine: () =>
+    "Redraw this as a clean fashion line drawing for vectorizing: pure black outlines of even weight on a pure white background. Keep exactly the same garment, silhouette, proportions, seams, pockets, closures and every design line as drawn. Remove all shading, hatching, texture, paper grain, figures, notes and annotations. No fills, no grey, no colour. Same framing.",
+
+  vectorFlat: () =>
+    "Redraw this as a flat-colour vector illustration: exactly the same garment, silhouette, proportions and details; solid flat fills in the garment's true colours (at most ten colours), thin dark outlines on edges and seams, no gradients, no texture, no shadows, pure white background, centered. Remove figures, notes and annotations.",
+
+  garmentFlat: (style: "line" | "flat") =>
+    [
+      "Create a technical flat (tech-pack drawing) of the garment in this image: front view, laid flat and symmetrical, centered on a pure white background, no person, no mannequin.",
+      "Show every construction detail exactly as in the photo: seams, topstitching (as dashed lines), panels, pockets, collar, cuffs, closures, buttons and hardware, hem finish.",
+      style === "line" ? "Pure black outlines of even weight only — no fills, no shading, no colour." : "Flat solid fills in the garment's true colours with thin dark outlines — no gradients, no texture, no shadows.",
+    ].join(" "),
+
+  /* ----- moodboard ----- */
+
+  moodboard: (direction: string, variant: number) =>
+    [
+      "Design an editorial fashion moodboard as a single finished image.",
+      direction.trim() ? `Direction: ${direction.trim()}.` : "",
+      "Combine the colours, materials, silhouettes and mood of the reference images into a cohesive board — reuse their imagery as cropped photo tiles.",
+      [
+        "Layout: a clean grid on an off-white board with five to seven photo tiles (looks, fabric close-ups, details, a location), a row of six colour chips along the bottom, and two small fabric swatches.",
+        "Layout: an asymmetric collage on a warm paper board, overlapping photo prints with torn and taped edges, pinned fabric swatches and a vertical strip of colour chips.",
+      ][variant % 2],
+      "Elegant spacing, art-directed, no logos, no readable words.",
+    ]
+      .filter(Boolean)
+      .join(" "),
+
+  /* ----- print pattern ----- */
+
+  printTile: (object: string, theme: string, variant: number, hasRef: boolean) =>
+    [
+      `Create a seamless repeating textile print: motif — ${object.trim()}; style and palette — ${theme.trim()}.`,
+      hasRef ? "Take the drawing style and colours from the reference image." : "",
+      ["All-over tossed layout, motifs at varied rotations, even density.", "Half-drop repeat layout, motifs in a regular staggered grid."][variant % 2],
+      "Edge-to-edge flat textile design that tiles perfectly: no border, no frame, no fabric mockup, no shadows, no text. Square.",
+    ]
+      .filter(Boolean)
+      .join(" "),
+
+  printSeam: () =>
+    "This is a textile print tile. Repaint only the highlighted bands so the pattern continues seamlessly through them — same motifs, scale, colours, spacing and drawing style as the rest of the tile. No visible seams or lines. Keep everything outside the bands identical.",
+
+  /* ----- trims ----- */
+
+  trim: (trim: string, masked: boolean, hasRef: boolean) =>
+    [
+      `Add ${trim.trim()} to the garment${masked ? ", exactly inside the highlighted area" : ", placed where it looks intentional and premium"}.`,
+      hasRef ? "Use the artwork in the last image for the patch, logo or hardware design and reproduce it exactly." : "",
+      "Realistic materials, stitching, thickness and shadows; correct perspective; follow the fabric's folds and curvature.",
+      "Keep everything else — the garment, its colour and construction, the model and the background — identical.",
+      FRAME,
+    ]
+      .filter(Boolean)
+      .join(" "),
+
+  /* ----- PDP ----- */
+
+  pdp: (shot: number, bg: "white" | "grey" | "warm", hasModel: boolean) => {
+    const backdrop = { white: "pure white (#FFFFFF)", grey: "light grey (#ECECEC)", warm: "warm stone (#E8E1D6)" }[bg];
+    const shots = [
+      "Front packshot: the garment alone on an invisible ghost mannequin, straight front view, centered with generous margins.",
+      "Three-quarter packshot: the garment on an invisible ghost mannequin turned 30 degrees to the left.",
+      "Detail shot: a close-up of the fabric texture and one signature construction detail (collar, buttons, pocket or stitching).",
+      hasModel
+        ? `On-model shot: the model from the second image wearing the garment, full body, relaxed front-facing pose. ${IDENTITY}`
+        : "On-model shot: a professional fashion model wearing the garment, full body, relaxed front-facing pose.",
+    ];
+    return [
+      `Product-page photo for an online store. ${shots[shot % shots.length]}`,
+      `Seamless ${backdrop} studio background, soft even e-commerce lighting, subtle natural shadow, sharp focus, true-to-life colour.`,
+      KEEP,
+      "Keep the exact colours. No text, no props, no logos added.",
+    ].join(" ");
+  },
 
   garment360: (hasBack: boolean) =>
     `Turntable product video: the garment rotates a full 360 degrees on an invisible mannequin, smooth constant speed, ${hasBack ? "revealing the back exactly as in the end frame, " : ""}studio background and lighting unchanged, the garment's shape, fabric and every detail stay consistent. No people, no camera shake, no text.`,

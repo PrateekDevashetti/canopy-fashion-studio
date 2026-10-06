@@ -16,7 +16,10 @@ export type ModelId =
   | "birefnet"
   | "veo-3-1"
   | "veo-3-1-fast"
-  | "kling-3";
+  | "kling-3"
+  | "seedream-5-pro"
+  | "seedance-2-5"
+  | "canopy-vectorizer";
 
 /** Every model the studio can call, with why it was picked (see docs/PRD.md §5). */
 export const MODELS: Record<ModelId, { label: string; kind: "image" | "vision" | "video" | "matting" | "tryon"; why: string }> = {
@@ -30,6 +33,9 @@ export const MODELS: Record<ModelId, { label: string; kind: "image" | "vision" |
   "veo-3-1": { label: "Veo 3.1", kind: "video", why: "Smooth, consistent product turntables." },
   "veo-3-1-fast": { label: "Veo 3.1 Fast", kind: "video", why: "Quick on-model orbits." },
   "kling-3": { label: "Kling 3.0 Pro", kind: "video", why: "Start-to-end frame control for front-to-back spins." },
+  "seedream-5-pro": { label: "Seedream 5.0 Pro", kind: "image", why: "Commercial-grade multi-reference composition for moodboards." },
+  "seedance-2-5": { label: "Seedance 2.5", kind: "video", why: "Long, steady image-to-video fallback with first/last-frame control." },
+  "canopy-vectorizer": { label: "Canopy Vectorizer", kind: "image", why: "Deterministic tracing to clean SVG paths — no invented detail." },
 };
 
 export type InputSpec =
@@ -76,6 +82,8 @@ export type Tool = {
   aspects: string[];
   defaultAspect: string;
   isNew?: boolean;
+  /** Non-generation tools render their own panel instead of inputs + Generate. */
+  panel?: "review" | "shopify";
 };
 
 export type SoonTool = { id: string; name: string; short: string; section: Section; description: string };
@@ -442,15 +450,238 @@ export const TOOLS: Tool[] = [
     aspects: ASPECTS,
     defaultAspect: "Auto",
   },
+
+  {
+    id: "sketch-to-vector",
+    name: "Sketch to Vector",
+    short: "Vector",
+    section: "concept",
+    description: "Turn a sketch into a vector image.",
+    blurb: "Turn a sketch into a clean, editable SVG — every line traced, nothing invented.",
+    icon: "/studio/icons/vector.png",
+    preview: "/studio/previews/vector.jpg",
+    media: "image",
+    models: ["nano-banana-pro", "canopy-vectorizer"],
+    cost: 4,
+    outputs: 1,
+    isNew: true,
+    inputs: [
+      { kind: "image", key: "sketch", label: "Sketch", info: "A hand sketch, photo of a sketch or technical drawing.", bindActive: true, collection: true, max: 8 },
+      {
+        kind: "select",
+        key: "style",
+        label: "Style",
+        options: [
+          { value: "line", label: "Clean line art" },
+          { value: "flat", label: "Flat colour" },
+        ],
+        default: "line",
+      },
+    ],
+    resolutions: ["SVG"],
+    aspects: ["Auto"],
+    defaultAspect: "Auto",
+  },
+  {
+    id: "garment-to-vector",
+    name: "Garment to Vector",
+    short: "Flats",
+    section: "concept",
+    description: "Turn a garment image into a vector image.",
+    blurb: "Turn any garment photo into a vector technical flat, ready for tech packs.",
+    icon: "/studio/icons/garment-vector.png",
+    preview: "/studio/previews/garment-vector.jpg",
+    media: "image",
+    models: ["nano-banana-pro", "canopy-vectorizer"],
+    cost: 4,
+    outputs: 1,
+    isNew: true,
+    inputs: [
+      { ...garment("Garment", "On-model, flatlay or ghostform photo."), collection: true, max: 8 } as InputSpec,
+      {
+        kind: "select",
+        key: "style",
+        label: "Style",
+        options: [
+          { value: "flat", label: "Colour flat" },
+          { value: "line", label: "Line flat (tech pack)" },
+        ],
+        default: "flat",
+      },
+    ],
+    resolutions: ["SVG"],
+    aspects: ["Auto"],
+    defaultAspect: "Auto",
+  },
+  {
+    id: "moodboard-maker",
+    name: "Moodboard Maker",
+    short: "Mood",
+    section: "concept",
+    description: "Get a moodboard for your look based off references.",
+    blurb: "Drop in references and get editorial moodboards with palette, materials and mood.",
+    icon: "/studio/icons/mood.png",
+    preview: "/studio/previews/mood.jpg",
+    media: "image",
+    models: ["seedream-5-pro", "nano-banana-pro"],
+    cost: 6,
+    outputs: 2,
+    isNew: true,
+    inputs: [
+      { kind: "image", key: "references", label: "References", info: "Looks, fabrics, places, colours.", collection: true, blend: true, max: 10 },
+      {
+        kind: "text",
+        key: "direction",
+        label: "Direction",
+        optional: true,
+        rows: 3,
+        placeholder: "e.g. Coastal workwear for SS27, salt-faded indigo, rope and canvas",
+        examples: ["Coastal workwear for SS27, salt-faded indigo, rope and canvas", "90s minimalism, slip dresses, cool greys and silver", "Desert utility, sand and olive, washed nylon"],
+      },
+    ],
+    resolutions: IMG_RES,
+    aspects: ["16:9", "3:2", "4:3", "1:1"],
+    defaultAspect: "16:9",
+  },
+
+  {
+    id: "review-mode",
+    name: "Review Mode",
+    short: "Review",
+    section: "refine",
+    description: "Collect comments and feedback on selected looks.",
+    blurb: "Share looks for review and collect comments and approvals in one place.",
+    icon: "/studio/icons/review.png",
+    preview: "/studio/previews/review.jpg",
+    media: "image",
+    models: [],
+    cost: 0,
+    outputs: 0,
+    panel: "review",
+    inputs: [],
+    resolutions: ["1K"],
+    aspects: ["Auto"],
+    defaultAspect: "Auto",
+  },
+  {
+    id: "print-pattern",
+    name: "Print Pattern",
+    short: "Print",
+    section: "refine",
+    description: "Generate a pattern with an object and theme.",
+    blurb: "Generate seamless, tileable prints from an object and a theme.",
+    icon: "/studio/icons/print.png",
+    preview: "/studio/previews/print.jpg",
+    media: "image",
+    models: ["nano-banana-pro"],
+    cost: 6,
+    outputs: 2,
+    isNew: true,
+    inputs: [
+      { kind: "text", key: "object", label: "Object", placeholder: "e.g. lemons with leaves", rows: 2, examples: ["Lemons with leaves", "Tiny anchors and rope knots", "Wild poppies"] },
+      { kind: "text", key: "theme", label: "Theme", placeholder: "e.g. 70s Riviera, faded, two-colour", rows: 2, examples: ["70s Riviera, faded, two-colour", "Japanese block print, indigo on ecru", "Bold Memphis, primary colours"] },
+      { kind: "image", key: "reference", label: "Reference", optional: true, allowEmpty: true },
+    ],
+    resolutions: IMG_RES,
+    aspects: ["1:1"],
+    defaultAspect: "1:1",
+  },
+  {
+    id: "trim-patches",
+    name: "Trim & Patches",
+    short: "Trims",
+    section: "refine",
+    description: "Add hardware, patches and embellishments.",
+    blurb: "Add hardware, patches and embellishments exactly where you want them.",
+    icon: "/studio/icons/trims.png",
+    preview: "/studio/previews/trims.jpg",
+    media: "image",
+    models: ["nano-banana-pro"],
+    cost: 6,
+    outputs: 1,
+    isNew: true,
+    inputs: [
+      { kind: "image", key: "garment", label: "Garment", optional: true },
+      { kind: "mask", key: "mask", label: "Placement", of: "garment", optional: true, info: "Where the trim goes. Leave empty to let the model place it." },
+      {
+        kind: "text",
+        key: "trim",
+        label: "Trim",
+        placeholder: "e.g. a round embroidered patch with a sun, gold metal snap buttons",
+        rows: 3,
+        examples: ["Round embroidered sun patch on the left chest", "Antique brass snap buttons", "Pearl embellishment along the collar"],
+      },
+      { kind: "image", key: "reference", label: "Patch / logo", optional: true, allowEmpty: true, info: "Artwork for the patch, logo or hardware." },
+    ],
+    resolutions: IMG_RES,
+    aspects: ASPECTS,
+    defaultAspect: "Auto",
+  },
+
+  {
+    id: "connect-shopify",
+    name: "Connect to Shopify",
+    short: "Shopify",
+    section: "showcase",
+    description: "Export to Shopify as product-ready assets.",
+    blurb: "Send looks straight to a Shopify product as product-ready images.",
+    icon: "/studio/icons/shopify.png",
+    preview: "/studio/previews/shopify.jpg",
+    media: "image",
+    models: [],
+    cost: 0,
+    outputs: 0,
+    panel: "shopify",
+    inputs: [],
+    resolutions: ["1K"],
+    aspects: ["Auto"],
+    defaultAspect: "Auto",
+  },
+  {
+    id: "pdp-shots",
+    name: "PDP Shots",
+    short: "PDP",
+    section: "showcase",
+    description: "Product-page shots for every SKU.",
+    blurb: "A full product-page set — packshot, angle, detail and on-model — on one consistent background.",
+    icon: "/studio/icons/pdp.png",
+    preview: "/studio/previews/pdp.jpg",
+    media: "image",
+    models: ["nano-banana-pro"],
+    cost: 5,
+    outputs: 4,
+    isNew: true,
+    inputs: [
+      { kind: "image", key: "garment", label: "Garment", info: "Flatlay, ghostform or on-model.", bindActive: true, collection: true, max: 6 },
+      { kind: "image", key: "model", label: "Model", optional: true, allowEmpty: true, info: "Optional: the model for the on-model shot." },
+      {
+        kind: "select",
+        key: "background",
+        label: "Background",
+        options: [
+          { value: "white", label: "Pure white" },
+          { value: "grey", label: "Light grey" },
+          { value: "warm", label: "Warm stone" },
+        ],
+        default: "white",
+      },
+    ],
+    resolutions: IMG_RES,
+    aspects: ["4:5", "3:4", "1:1"],
+    defaultAspect: "4:5",
+  },
 ];
 
-export const SOON: SoonTool[] = [
-  { id: "sketch-to-vector", name: "Sketch to Vector", short: "Vector", section: "concept", description: "Turn a sketch into a vector image." },
-  { id: "moodboard-maker", name: "Moodboard Maker", short: "Mood", section: "concept", description: "Get a moodboard for your look based off references." },
-  { id: "print-pattern", name: "Print Pattern", short: "Print", section: "refine", description: "Generate a pattern with an object and theme." },
-  { id: "trim-patches", name: "Trim & Patches", short: "Trims", section: "refine", description: "Add hardware, patches and embellishments." },
-  { id: "pdp-shots", name: "PDP Shots", short: "PDP", section: "showcase", description: "Product-page shots for every SKU." },
+/** Rail order (matches the product's tool list). */
+const ORDER = [
+  "prompt", "sketch-to-render", "garment-extractor", "concept", "sketch-to-vector", "garment-to-vector", "moodboard-maker",
+  "garment-recolor", "fabric-swap", "ghostform", "flatlay", "review-mode", "print-pattern", "trim-patches",
+  "model-maker", "garment-360", "garment-swap", "photo-shoot", "model-try-on", "multi-angle", "model-360", "connect-shopify", "pdp-shots",
 ];
+TOOLS.sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
+
+/** Everything that was "coming soon" has shipped; kept for future roadmap entries. */
+export const SOON: SoonTool[] = [];
 
 /** Built-in editor operations that also land in the feed as runs. */
 export const EDITOR_OPS = {

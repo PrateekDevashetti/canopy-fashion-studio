@@ -21,6 +21,7 @@ import {
   SquareArrowOutUpRight,
   SquareDashedMousePointer,
   Type,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -224,6 +225,53 @@ function ProjectMenu() {
   );
 }
 
+/** Signed-in users: credits at a glance + account menu (guests get "Sign in" instead). */
+function CreditsPill() {
+  const me = useStudio((s) => s.me);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
+  if (!me) return null;
+  const low = me.credits < 6;
+  return (
+    <>
+      <button ref={ref} aria-label="Credits and account" className="glass flex h-[40px] items-center gap-2 rounded-[11px] pr-1.5 pl-3 text-[13px] text-fg hover:bg-[#1f1f1f]" onClick={() => setOpen((o) => !o)} data-testid="credits-pill">
+        <Zap size={13} className={low ? "text-danger" : "text-accent"} fill="currentColor" />
+        <span className="tabular-nums">{me.credits}</span>
+        <span className="text-dim">credits</span>
+        <span className="ml-1 flex h-[28px] w-[28px] items-center justify-center overflow-hidden rounded-full bg-[#2a2a2a] text-[11.5px] font-medium">
+          {me.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={me.imageUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            (me.name || me.email || "?").slice(0, 1).toUpperCase()
+          )}
+        </span>
+      </button>
+      <Popover open={open} onClose={() => setOpen(false)} anchor={ref} placement="bottom-end" className="w-[240px]">
+        <div className="px-2.5 pt-1.5 pb-2">
+          <div className="truncate text-[12.5px] text-fg">{me.name || "Your account"}</div>
+          <div className="truncate text-[11.5px] text-mute">{me.email}</div>
+        </div>
+        <div className="mx-2.5 mb-2 rounded-[9px] border border-line-2 bg-[#1b1b1b] p-2.5">
+          <div className="flex items-baseline justify-between">
+            <span className="text-[11.5px] text-dim">Credits left</span>
+            <span className={cn("text-[15px] font-medium tabular-nums", low && "text-danger")}>{me.credits}</span>
+          </div>
+          <a className="mt-2 block text-[11.5px] text-accent hover:underline" href="mailto:hello@trycanopy.space?subject=Fashion%20Studio%20credits">
+            Get more credits →
+          </a>
+        </div>
+        <Link className="menu-item" href="/studios" onClick={() => setOpen(false)}>
+          All projects
+        </Link>
+        <Link className="menu-item" href="/settings" onClick={() => setOpen(false)}>
+          Settings &amp; usage
+        </Link>
+      </Popover>
+    </>
+  );
+}
+
 function ZoomMenu() {
   const zoom = useStudio((s) => s.zoom);
   const set = useStudio((s) => s.set);
@@ -364,6 +412,7 @@ export function TopBar() {
               )}
             </div>
           )}
+          {!s.me?.guest && <CreditsPill />}
         </div>
       </div>
       <ShareDialog open={share} onClose={() => setShare(false)} assetIds={active ? [active.id] : []} />

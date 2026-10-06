@@ -85,7 +85,7 @@ export async function locateSubject(buf: Buffer): Promise<{ face: Box | null; ou
  */
 export async function detectGarments(asset: AssetRow, opts: { refresh?: boolean } = {}): Promise<Segment[]> {
   if (asset.segments?.length && !opts.refresh) return asset.segments;
-  const key = asset.media === "video" ? asset.posterKey : asset.storageKey;
+  const key = asset.media === "video" ? asset.posterKey : asset.mime === "image/svg+xml" ? (asset.previewKey ?? asset.storageKey) : asset.storageKey;
   if (!key) return [];
   const buf = await getObjectBuffer(key);
   if (!buf) throw new Error("Image not found in storage");

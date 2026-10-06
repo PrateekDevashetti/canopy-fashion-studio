@@ -74,6 +74,8 @@ async function sanitize(tool: ToolLike, projectId: string, raw: Record<string, u
         .filter((c): c is { hex: string; name?: string } => typeof c?.hex === "string" && HEX.test(c.hex))
         .map((c) => ({ hex: c.hex.toLowerCase(), ...(typeof c.name === "string" && c.name.trim() ? { name: c.name.trim().slice(0, 40) } : {}) }));
       if (list.length) out[spec.key] = spec.collection ? list.slice(0, 12) : list.slice(0, 1);
+    } else if (spec.kind === "select") {
+      out[spec.key] = typeof v === "string" && spec.options.some((o) => o.value === v) ? v : spec.default;
     }
   }
   if (ids.length) {

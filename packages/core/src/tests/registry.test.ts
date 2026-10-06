@@ -6,7 +6,8 @@ test("every section has tools and every tool has unique id/short label", () => {
   for (const s of SECTIONS) assert.ok(TOOLS.some((t) => t.section === s.id), s.id);
   assert.equal(new Set(TOOLS.map((t) => t.id)).size, TOOLS.length);
   assert.equal(new Set(TOOLS.map((t) => t.short)).size, TOOLS.length);
-  assert.equal(TOOLS.length, 15);
+  assert.equal(TOOLS.length, 23);
+  assert.equal(TOOLS.map((t) => t.id).join(","), "prompt,sketch-to-render,garment-extractor,concept,sketch-to-vector,garment-to-vector,moodboard-maker,garment-recolor,fabric-swap,ghostform,flatlay,review-mode,print-pattern,trim-patches,model-maker,garment-360,garment-swap,photo-shoot,model-try-on,multi-angle,model-360,connect-shopify,pdp-shots");
   for (const s of SOON) assert.ok(!toolById(s.id));
 });
 

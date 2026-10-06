@@ -127,6 +127,26 @@ test("color match moves the garment onto the requested color and leaves the rest
   assert.deepEqual([...px.subarray(0, 3)], [200, 200, 200], "outside untouched");
 });
 
+test("greyscale and grey+alpha inputs never produce misaligned (striped) pixels", async () => {
+  const W = 120, H = 80;
+  const grey = await sharp({ create: { width: W, height: H, channels: 3, background: "#777" } }).greyscale().png().toBuffer();
+  const greyAlpha = await sharp({ create: { width: W, height: H, channels: 4, background: { r: 90, g: 90, b: 90, alpha: 1 } } }).greyscale().png().toBuffer();
+  for (const b of [grey, greyAlpha]) {
+    const r = await imaging.rawRGB(sharp(b), 3);
+    assert.equal(r.data.length, W * H * 3);
+  }
+  // Chroma key where the model returned a grey+alpha PNG: every row must key identically.
+  const original = await sharp({ create: { width: W, height: H, channels: 3, background: "#c84" } }).png().toBuffer();
+  const out = await imaging.chromaKey(greyAlpha, original);
+  const { data, info } = await sharp(out).raw().toBuffer({ resolveWithObject: true });
+  assert.equal(info.channels, 4);
+  const row = (y: number) => data.subarray(y * W * 4, (y + 1) * W * 4);
+  for (let y = 1; y < H; y++) assert.ok(row(y).equals(row(0)), `row ${y} differs (stripes)`);
+  // Editor ops on a greyscale master.
+  const cropped = await edit.cropImage(grey, "image/png", { cx: 0.5, cy: 0.5, w: 0.5, h: 0.5, rot: 0 });
+  assert.deepEqual([(await sharp(cropped).metadata()).width, (await sharp(cropped).metadata()).height], [60, 40]);
+});
+
 test("pad → unpad round-trips odd aspect ratios without stretching", async () => {
   const input = await photo(1000, 1700, "png"); // ~0.588, between 9:16 and 2:3
   const { buf, pad } = await imaging.padToAspect(input);

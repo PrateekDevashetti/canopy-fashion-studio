@@ -5,7 +5,7 @@ import { newId } from "./ids";
 import { deleteObject, fileUrl } from "./storage";
 import { runLabel, toolById } from "./tools/registry";
 
-export const SIGNUP_CREDITS = () => Number(process.env.FASHION_SIGNUP_CREDITS ?? 200);
+export const SIGNUP_CREDITS = () => Number(process.env.FASHION_SIGNUP_CREDITS ?? 20);
 
 export class HttpError extends Error {
   constructor(

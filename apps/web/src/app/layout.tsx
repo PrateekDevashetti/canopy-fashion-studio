@@ -31,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       }}
       localization={{
         signIn: { start: { title: "Sign in to Fashion Studio", subtitle: "Welcome back. Pick up where your collection left off." } },
-        signUp: { start: { title: "Create your Canopy account", subtitle: "200 free credits to start. No card needed." } },
+        signUp: { start: { title: "Create your Canopy account", subtitle: "20 free credits to start. No card needed." } },
       }}
     >
       {body}

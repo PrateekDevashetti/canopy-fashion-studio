@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import { applyAdjust, isNeutral, type Adjust, type CropSpec } from "./adjust";
 import { MAX_PIXELS } from "./media";
+import { rawRGB } from "./engine/imaging";
 
 /**
  * Editor operations rendered on the server against the full-resolution master, so a saved edit
@@ -17,8 +18,7 @@ async function encode(img: sharp.Sharp, sourceMime: string, hasAlpha: boolean): 
 
 /** Upright RGBA pixels of the master. */
 async function upright(buf: Buffer) {
-  const { data, info } = await open(buf).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  return { data, width: info.width, height: info.height };
+  return rawRGB(open(buf).rotate(), 4);
 }
 
 /**

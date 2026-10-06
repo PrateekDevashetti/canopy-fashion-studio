@@ -114,6 +114,78 @@ export async function falWait<T = Record<string, unknown>>(ref: QueueRef, deadli
   throw new ProviderError(`${ref.endpoint}: timed out`, 504, false);
 }
 
+/* ---------- OpenRouter video (Veo 3.1 / Kling v3 / Seedance via one API) ---------- */
+
+const orKey = () => {
+  const k = process.env.OPENROUTER_API_KEY;
+  if (!k) throw new ProviderError("OPENROUTER_API_KEY is not configured", 500);
+  return k;
+};
+
+export type OrVideoInput = {
+  prompt: string;
+  firstFrameUrl: string;
+  lastFrameUrl?: string | null;
+  duration: number;
+  resolution: string;
+  aspect?: string | null;
+  audio?: boolean;
+};
+
+/** Submit an image-to-video job. Frame images must be public HTTPS URLs (presigned storage URLs work). */
+export async function openrouterVideoSubmit(model: string, v: OrVideoInput): Promise<QueueRef> {
+  return withRetry(async () => {
+    const frame_images = [
+      { type: "image_url", image_url: { url: v.firstFrameUrl }, frame_type: "first_frame" },
+      ...(v.lastFrameUrl ? [{ type: "image_url", image_url: { url: v.lastFrameUrl }, frame_type: "last_frame" }] : []),
+    ];
+    const res = await fetch("https://openrouter.ai/api/v1/videos", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${orKey()}`, "content-type": "application/json", "X-Title": "Canopy Fashion Studio" },
+      body: JSON.stringify({
+        model,
+        prompt: v.prompt,
+        frame_images,
+        duration: v.duration,
+        resolution: v.resolution,
+        ...(v.aspect ? { aspect_ratio: v.aspect } : {}),
+        generate_audio: v.audio ?? false,
+      }),
+    });
+    if (!res.ok) throw new ProviderError(`openrouter ${model}: ${await readError(res)}`, res.status, res.status === 429 || res.status >= 500);
+    const j = (await res.json()) as { id: string; polling_url?: string };
+    const statusUrl = j.polling_url ?? `https://openrouter.ai/api/v1/videos/${j.id}`;
+    return { endpoint: `openrouter:${model}`, requestId: j.id, statusUrl, responseUrl: `https://openrouter.ai/api/v1/videos/${j.id}/content?index=0` };
+  });
+}
+
+/** Poll an OpenRouter video job and download the MP4. */
+export async function openrouterVideoWait(ref: QueueRef, deadlineMs = 20 * 60_000): Promise<Buffer> {
+  const until = Date.now() + deadlineMs;
+  let delay = 5000;
+  while (Date.now() < until) {
+    const res = await fetch(ref.statusUrl, { headers: { Authorization: `Bearer ${orKey()}` } }).catch(() => null);
+    if (res?.ok) {
+      const s = (await res.json()) as { status: string; error?: unknown; unsigned_urls?: string[] };
+      if (s.status === "completed") {
+        const url = s.unsigned_urls?.[0] ?? ref.responseUrl;
+        const out = await fetch(url, { headers: url.startsWith("https://openrouter.ai/") ? { Authorization: `Bearer ${orKey()}` } : {} });
+        if (!out.ok) throw new ProviderError(`${ref.endpoint}: download ${out.status}`, out.status, out.status >= 500);
+        return Buffer.from(await out.arrayBuffer());
+      }
+      if (["failed", "cancelled", "expired"].includes(s.status)) {
+        const err = typeof s.error === "string" ? s.error : s.error ? JSON.stringify(s.error).slice(0, 200) : s.status;
+        throw new ProviderError(`${ref.endpoint}: ${err}`, 500, false);
+      }
+    } else if (res && res.status !== 404 && res.status < 500) {
+      throw new ProviderError(`${ref.endpoint}: ${await readError(res)}`, res.status, false);
+    }
+    await sleep(delay);
+    delay = Math.min(delay * 1.3, 15_000);
+  }
+  throw new ProviderError(`${ref.endpoint}: timed out`, 504, false);
+}
+
 /** Download a provider result URL into memory. */
 export async function download(url: string): Promise<{ buf: Buffer; mime: string }> {
   if (url.startsWith("data:")) {
@@ -154,7 +226,8 @@ export async function openrouterImage(prompt: string, images: string[], opts: { 
       headers: { Authorization: `Bearer ${key}`, "content-type": "application/json", "X-Title": "Canopy Fashion Studio" },
       body: JSON.stringify({
         model,
-        modalities: ["image", "text"],
+        // Gemini / GPT-5 answer with image+text; dedicated image models (Seedream, FLUX, Recraft…) are image-only.
+        modalities: /^(google|openai\/gpt-5)/.test(model) ? ["image", "text"] : ["image"],
         ...(Object.keys(image_config).length ? { image_config } : {}),
         messages: [{ role: "user", content: [...images.map((url) => ({ type: "image_url", image_url: { url } })), { type: "text", text: prompt }] }],
       }),

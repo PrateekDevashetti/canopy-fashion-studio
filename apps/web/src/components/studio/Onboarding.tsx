@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, X } from "lucide-react";
 import { useStudio } from "@/lib/store";
-import { endTour, enterStep, startTour, TOUR } from "@/lib/tour";
+import { AUTO_ADVANCE_MS, autoAdvance, endTour, enterStep, startTour, TOUR } from "@/lib/tour";
 import { CanopyMark, Spinner } from "@/components/ui";
 import { Collage } from "./EmptyState";
 import { SignupGate } from "./SignupGate";
@@ -91,6 +91,11 @@ function Spotlight() {
         <button aria-label="Close tour" className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80" onClick={() => void endTour()}>
           <X size={16} />
         </button>
+        {!last && (
+          <div className="h-[2px] w-full bg-white/10" aria-hidden>
+            <div key={step} className="h-full bg-accent" style={{ animation: `tour-countdown ${AUTO_ADVANCE_MS}ms linear forwards` }} />
+          </div>
+        )}
         <div className="px-5 pt-4 pb-5">
           <div className="text-[16px] font-medium text-fg">{def.title}</div>
           <p className="mt-1.5 text-[13.5px] leading-[1.45] text-fg-2">{def.body}</p>
@@ -168,6 +173,13 @@ export function Onboarding() {
     }
     if (TOUR[step]?.id === "review" && view === "feed") void enterStep(5);
   }, [welcome, step, selection, view]);
+
+  // …or after AUTO_ADVANCE_MS without a click, do the step for them (not on the final step).
+  useEffect(() => {
+    if (welcome !== "tour" || step >= TOUR.length - 1) return;
+    const t = window.setTimeout(() => void autoAdvance(step), AUTO_ADVANCE_MS);
+    return () => window.clearTimeout(t);
+  }, [welcome, step]);
 
   useEffect(() => {
     const open = () => setGate(true);

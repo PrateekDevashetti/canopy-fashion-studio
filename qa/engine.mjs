@@ -73,6 +73,12 @@ const JOBS = [
   ["remove-background", { image: render.id }, {}],
   ["garment-360", { garment: render.id }, { resolution: "720p", aspect: "Auto" }],
   ["model-360", { look: tryon.id }, { resolution: "720p", aspect: "Auto" }],
+  ["sketch-to-vector", { sketch: [sketch.id], style: "line" }, S],
+  ["garment-to-vector", { garment: [render.id], style: "flat" }, S],
+  ["moodboard-maker", { references: [render.id, swatch.id, tryon.id], direction: "Coastal workwear for SS27, salt-faded indigo, rope and canvas" }, { resolution: "1K", aspect: "16:9" }],
+  ["print-pattern", { object: "lemons with leaves", theme: "70s Riviera, faded, two-colour" }, { resolution: "1K", aspect: "1:1" }],
+  ["trim-patches", { garment: render.id, trim: "a round embroidered sun patch on the left chest pocket" }, S],
+  ["pdp-shots", { garment: [render.id], model: model.id, background: "white" }, { resolution: "1K", aspect: "4:5" }],
 ].filter(([t]) => !only || only.includes(t));
 
 const results = [];

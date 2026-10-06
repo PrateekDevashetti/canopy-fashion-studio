@@ -37,6 +37,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ key: str
     "content-length": String(obj.body.length),
     "x-content-type-options": "nosniff",
   };
+  // SVGs can carry script: sanitized on store, and sandboxed here if opened directly.
+  if (key.endsWith(".svg")) headers["content-security-policy"] = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox";
   if (range || obj.partial) headers["content-range"] = `bytes ${obj.start}-${obj.end}/${obj.total}`;
   if (dl) headers["content-disposition"] = `attachment; filename="${dl.replace(/[^\w.\- ]+/g, "_").slice(0, 100)}"`;
   return new Response(new Uint8Array(obj.body), { status: range || obj.partial ? 206 : 200, headers });
