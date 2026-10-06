@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Ellipsis, Plus, Search, Settings } from "lucide-react";
 import { api, timeAgo, type ProjectDTO } from "@/lib/api";
-import { CanopyMark, ConfirmProvider, Popover, Spinner, useConfirm, cn } from "@/components/ui";
+import { CanopyMark, ConfirmProvider, Modal, Popover, Spinner, useConfirm, cn } from "@/components/ui";
 import { UserMenu } from "./UserMenu";
 
 function StudioCard() {
@@ -94,9 +94,17 @@ function Inner({ user, initial }: { user: { name: string; email: string; credits
     const t = setTimeout(() => api.projects(q).then((r) => setProjects(r.projects)).catch(() => {}), 150);
     return () => clearTimeout(t);
   }, [q]);
-  const rename = async (p: ProjectDTO) => {
-    const name = window.prompt("Rename project", p.name);
-    if (!name?.trim()) return;
+  const [renaming, setRenaming] = useState<ProjectDTO | null>(null);
+  const [draft, setDraft] = useState("");
+  const rename = (p: ProjectDTO) => {
+    setDraft(p.name);
+    setRenaming(p);
+  };
+  const saveRename = async () => {
+    const p = renaming;
+    const name = draft.trim();
+    setRenaming(null);
+    if (!p || !name || name === p.name) return;
     await api.renameProject(p.id, name);
     setProjects((ps) => ps.map((x) => (x.id === p.id ? { ...x, name } : x)));
   };
@@ -173,6 +181,27 @@ function Inner({ user, initial }: { user: { name: string; email: string; credits
           </>
         )}
       </main>
+      <Modal open={!!renaming} onClose={() => setRenaming(null)} title="Rename project">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveRename();
+          }}
+        >
+          <label className="mb-1.5 block text-[12px] text-dim" htmlFor="rename-project">
+            Project name
+          </label>
+          <input id="rename-project" autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={80} className="field h-10 w-full px-3" />
+          <div className="mt-4 flex justify-end gap-2">
+            <button type="button" className="btn" onClick={() => setRenaming(null)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-white">
+              Save
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

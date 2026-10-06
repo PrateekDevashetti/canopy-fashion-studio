@@ -55,7 +55,7 @@ export function SettingsView({ user, ledger }: { user: { name: string; email: st
                 <div key={m} className={cn("flex items-center gap-4 bg-panel px-4 py-3", i && "border-t border-line")}>
                   <div className="min-w-0 flex-1">
                     <div className="text-[13.5px] text-fg">{MODELS[m].label}</div>
-                    <div className="truncate text-[11.5px] text-mute">{users.length ? `Used by ${users.join(", ")}` : MODELS[m].kind === "matting" ? "Used by Remove background" : "Used by editor tools"}</div>
+                    <div className="text-[11.5px] text-mute">{MODELS[m].why} {users.length ? `Used by ${users.join(", ")}.` : MODELS[m].kind === "matting" ? "Used by Remove background." : "Used by editor tools."}</div>
                   </div>
                   {saving === m && <Spinner size={13} />}
                   <button role="switch" aria-checked={!off} aria-label={`Enable ${MODELS[m].label}`} className={cn("relative h-[20px] w-[34px] rounded-full transition-colors", off ? "bg-[#3a3a3a]" : "bg-accent")} onClick={() => void toggle(m)}>

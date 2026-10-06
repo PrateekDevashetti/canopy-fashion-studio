@@ -1,0 +1,1367 @@
+{
+  "schemaVersion": "report-1",
+  "run": {
+    "id": "01a111dd-62d5-709c-b805-8c02c3b05f69",
+    "specVersion": "0.1",
+    "runner": {
+      "name": "e2e",
+      "version": "0.17.0"
+    },
+    "status": "passed",
+    "exitCode": 0,
+    "startedAt": "2026-10-06T15:38:04.221Z",
+    "finishedAt": "2026-10-06T15:38:17.102Z",
+    "project": {
+      "id": "canopy-fashion-studio",
+      "configDigest": "ea54900ab386e65d864cd33b82ff7307c190b5ee6c52fa36dd6a7328916f264d"
+    },
+    "environment": {
+      "ci": false,
+      "trustNoticeShown": false,
+      "os": "darwin 25.2.0",
+      "arch": "arm64",
+      "runtime": "node v26.7.0"
+    },
+    "vcs": {
+      "commit": "107b50d237d574ffc7d07c0a5b9ca134101985a3",
+      "branch": "feat/studio",
+      "dirty": true
+    },
+    "targets": [
+      {
+        "id": "web",
+        "index": 0,
+        "platform": "web",
+        "baseOrigin": "http://localhost:3200",
+        "environment": "test",
+        "engine": {
+          "name": "web",
+          "version": "0.12.0",
+          "spiVersion": 1
+        },
+        "capabilities": [
+          "actions",
+          "artifacts",
+          "browser",
+          "keyboard",
+          "location",
+          "observation",
+          "pointer",
+          "state"
+        ],
+        "artifactCapabilities": [
+          "screenshot",
+          "trace",
+          "video"
+        ],
+        "stateCapability": true
+      }
+    ],
+    "serialGroups": [],
+    "results": [
+      {
+        "id": "a6ddef2601abc221a1f48da388515b444472460af6da65cc393773fba7b64e12",
+        "testId": "tests/e2e/t01-landing.e2e.ts::landing%20renders%20every%20section%20in%20the%20reference%20order",
+        "kind": "test",
+        "declarationIndex": 0,
+        "titlePath": [
+          "landing renders every section in the reference order"
+        ],
+        "file": "tests/e2e/t01-landing.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t01-landing.e2e.ts",
+          "line": 5,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "216dde28be3499cf9d6b76c09032aefd0d798653b805fe2059115de64c2062ee",
+        "testId": "tests/e2e/t01-landing.e2e.ts::FAQ%20accordion%20opens%20and%20closes",
+        "kind": "test",
+        "declarationIndex": 1,
+        "titlePath": [
+          "FAQ accordion opens and closes"
+        ],
+        "file": "tests/e2e/t01-landing.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t01-landing.e2e.ts",
+          "line": 20,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "17818198ffb170b14beb0f29a8a549d176d2b38ef04d034bdc2b44061376c368",
+        "testId": "tests/e2e/t01-landing.e2e.ts::nav%20dropdown%20lists%20the%20Canopy%20products",
+        "kind": "test",
+        "declarationIndex": 2,
+        "titlePath": [
+          "nav dropdown lists the Canopy products"
+        ],
+        "file": "tests/e2e/t01-landing.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t01-landing.e2e.ts",
+          "line": 31,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "4976e0d7f62fefd36d2f882a6d80a905f28710d776bf71dc4e99a11c1192793f",
+        "testId": "tests/e2e/t01-landing.e2e.ts::TRY%20IT%20NOW%20cards%20deep-link%20into%20the%20right%20tool",
+        "kind": "test",
+        "declarationIndex": 3,
+        "titlePath": [
+          "TRY IT NOW cards deep-link into the right tool"
+        ],
+        "file": "tests/e2e/t01-landing.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t01-landing.e2e.ts",
+          "line": 38,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "2ea85b3ca8a9797803b9f7e215b479304dc906b8d800d650c3797048868820b3",
+        "testId": "tests/e2e/t01-landing.e2e.ts::an%20agent%20finds%20the%20workflow%20strip%20and%20tool%20cards",
+        "kind": "test",
+        "declarationIndex": 4,
+        "titlePath": [
+          "an agent finds the workflow strip and tool cards"
+        ],
+        "file": "tests/e2e/t01-landing.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t01-landing.e2e.ts",
+          "line": 47,
+          "column": 3
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "c02e6955b9997a804deae6560cc48bdb67c4860b8c04af2dc7dc61e26c599d35",
+        "testId": "tests/e2e/t02-studio-shell.e2e.ts::empty%20project%20shows%20the%20start%20screen%20and%20every%20tool",
+        "kind": "test",
+        "declarationIndex": 0,
+        "titlePath": [
+          "empty project shows the start screen and every tool"
+        ],
+        "file": "tests/e2e/t02-studio-shell.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t02-studio-shell.e2e.ts",
+          "line": 5,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "5af7c2ca951ab3010595420541e3bdeb3325271ad2c754cfc63c5a16b57d94b4",
+        "testId": "tests/e2e/t02-studio-shell.e2e.ts::hovering%20a%20tool%20shows%20its%20preview%20card%3B%20clicking%20opens%20its%20panel",
+        "kind": "test",
+        "declarationIndex": 1,
+        "titlePath": [
+          "hovering a tool shows its preview card; clicking opens its panel"
+        ],
+        "file": "tests/e2e/t02-studio-shell.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t02-studio-shell.e2e.ts",
+          "line": 15,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "cb630861680a93b4a68f05f1a8cbffd2d2d7e96da60af6f3e14024d5e7f819ac",
+        "testId": "tests/e2e/t02-studio-shell.e2e.ts::E%20%2F%20F%20switch%20Editor%20and%20Feed",
+        "kind": "test",
+        "declarationIndex": 2,
+        "titlePath": [
+          "E / F switch Editor and Feed"
+        ],
+        "file": "tests/e2e/t02-studio-shell.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t02-studio-shell.e2e.ts",
+          "line": 31,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "b7da656432ab55504aa3c0d41c38862fa3b0897529b878e6274f4dbd711c471a",
+        "testId": "tests/e2e/t02-studio-shell.e2e.ts::project%20menu%20renames%20the%20project",
+        "kind": "test",
+        "declarationIndex": 3,
+        "titlePath": [
+          "project menu renames the project"
+        ],
+        "file": "tests/e2e/t02-studio-shell.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t02-studio-shell.e2e.ts",
+          "line": 43,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "d4a3b2cf2423d33ebbbdc0ddc3f63b1242a02b5b34a66e603a478fbeddf0c5aa",
+        "testId": "tests/e2e/t03-onboarding.e2e.ts::the%20guided%20tour%20runs%20end%20to%20end",
+        "kind": "test",
+        "declarationIndex": 0,
+        "titlePath": [
+          "the guided tour runs end to end"
+        ],
+        "file": "tests/e2e/t03-onboarding.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t03-onboarding.e2e.ts",
+          "line": 5,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": true,
+        "status": "passed",
+        "attempts": [
+          {
+            "id": "01a111dd-6660-74b5-beb4-938e75106e2b",
+            "index": 0,
+            "status": "passed",
+            "startedAt": "2026-10-06T15:38:04.768Z",
+            "durationMs": 8380,
+            "artifacts": [
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:artifact:0",
+                "kind": "trace",
+                "mediaType": "application/zip",
+                "redaction": "not-required",
+                "producer": {
+                  "kind": "attempt"
+                },
+                "path": "web/tests_e2e_t03-onboarding.e2e.ts__the_20guided_20tour_20runs_20end_20to_20end-d9552e40/default/attempt-0/trace/trace.zip",
+                "size": 9419415,
+                "sha256": "0c3866634160495cb18e09592be252fc65347dd916fd10ea3596cfaf583bc5a2"
+              }
+            ],
+            "secondaryErrors": [],
+            "cleanup": "complete",
+            "steps": [
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:0",
+                "index": 0,
+                "kind": "resource",
+                "api": "browser.goto",
+                "label": "http://localhost:3200/studio/prj_aws1ehas3coiakxr?tour=1",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:05.159Z",
+                "durationMs": 1211,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/helpers.ts",
+                  "line": 67,
+                  "column": 17
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:1",
+                "index": 1,
+                "kind": "locator",
+                "api": "locator.waitFor",
+                "label": "locator(\"[data-tour=\\\"rail\\\"]\") → visible",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:06.372Z",
+                "durationMs": 30,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/helpers.ts",
+                  "line": 68,
+                  "column": 47
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:2",
+                "index": 2,
+                "kind": "assertion",
+                "api": "expect.toBeVisible",
+                "label": "getByText(\"Welcome to Fashion Studio\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:06.404Z",
+                "durationMs": 5,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 8,
+                  "column": 63
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:3",
+                "index": 3,
+                "kind": "locator",
+                "api": "locator.click",
+                "label": "getByRole(\"button\", name: \"Get started\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:06.410Z",
+                "durationMs": 127,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 9,
+                  "column": 61
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:4",
+                "index": 4,
+                "kind": "assertion",
+                "api": "expect.toBeVisible",
+                "label": "getByText(\"Start with a sketch\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:06.537Z",
+                "durationMs": 12,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 10,
+                  "column": 57
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:5",
+                "index": 5,
+                "kind": "locator",
+                "api": "locator.click",
+                "label": "locator(\"[data-tour=\\\"generate\\\"]\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:06.549Z",
+                "durationMs": 1088,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 11,
+                  "column": 51
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:6",
+                "index": 6,
+                "kind": "assertion",
+                "api": "expect.toBeVisible",
+                "label": "getByText(\"Select your garment\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:07.638Z",
+                "durationMs": 865,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 12,
+                  "column": 57
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:7",
+                "index": 7,
+                "kind": "resource",
+                "api": "browser.evaluate",
+                "label": "",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:08.503Z",
+                "durationMs": 1520,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 14,
+                  "column": 17
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:8",
+                "index": 8,
+                "kind": "resource",
+                "api": "browser.mouse.move",
+                "label": "",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:10.040Z",
+                "durationMs": 30,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 16,
+                  "column": 23
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:9",
+                "index": 9,
+                "kind": "resource",
+                "api": "browser.mouse.down",
+                "label": "",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:10.072Z",
+                "durationMs": 88,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 17,
+                  "column": 23
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:10",
+                "index": 10,
+                "kind": "resource",
+                "api": "browser.mouse.up",
+                "label": "",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:10.160Z",
+                "durationMs": 8,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 18,
+                  "column": 23
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:11",
+                "index": 11,
+                "kind": "assertion",
+                "api": "expect.toBeVisible",
+                "label": "getByText(\"Recolor your garment\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:10.169Z",
+                "durationMs": 10,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 19,
+                  "column": 58
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:12",
+                "index": 12,
+                "kind": "locator",
+                "api": "locator.click",
+                "label": "locator(\"[data-tour=\\\"generate\\\"]\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:10.179Z",
+                "durationMs": 43,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 20,
+                  "column": 51
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:13",
+                "index": 13,
+                "kind": "assertion",
+                "api": "expect.toBeVisible",
+                "label": "getByText(\"Try it on\").first()",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:10.222Z",
+                "durationMs": 864,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 21,
+                  "column": 55
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:14",
+                "index": 14,
+                "kind": "locator",
+                "api": "locator.click",
+                "label": "locator(\"[data-tour=\\\"generate\\\"]\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:11.086Z",
+                "durationMs": 52,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 22,
+                  "column": 51
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:15",
+                "index": 15,
+                "kind": "assertion",
+                "api": "expect.toBeVisible",
+                "label": "getByText(\"Review your work\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:11.138Z",
+                "durationMs": 427,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 23,
+                  "column": 54
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:16",
+                "index": 16,
+                "kind": "locator",
+                "api": "locator.click",
+                "label": "locator(\"[data-tour=\\\"feed-toggle\\\"]\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:11.565Z",
+                "durationMs": 96,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 24,
+                  "column": 54
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:17",
+                "index": 17,
+                "kind": "assertion",
+                "api": "expect.toBeVisible",
+                "label": "getByText(\"Export & share for review\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:11.661Z",
+                "durationMs": 6,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 25,
+                  "column": 63
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:18",
+                "index": 18,
+                "kind": "assertion",
+                "api": "expect.toBeVisible",
+                "label": "getByText(\"1 asset selected\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:11.667Z",
+                "durationMs": 5,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 26,
+                  "column": 54
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:19",
+                "index": 19,
+                "kind": "locator",
+                "api": "locator.click",
+                "label": "getByRole(\"button\", name: \"Finish\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:11.672Z",
+                "durationMs": 74,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 27,
+                  "column": 56
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:20",
+                "index": 20,
+                "kind": "assertion",
+                "api": "expect.not.toBeVisible",
+                "label": "getByText(\"Export & share for review\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:11.746Z",
+                "durationMs": 1008,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 28,
+                  "column": 67
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:21",
+                "index": 21,
+                "kind": "assertion",
+                "api": "expect.toBeVisible",
+                "label": "getByText(\"Model Try-On\").first()",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:12.755Z",
+                "durationMs": 11,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 30,
+                  "column": 118
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:22",
+                "index": 22,
+                "kind": "assertion",
+                "api": "expect.toBeVisible",
+                "label": "getByText(\"Garment Recolor\").first()",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:12.766Z",
+                "durationMs": 7,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 30,
+                  "column": 118
+                }
+              },
+              {
+                "id": "01a111dd-6660-74b5-beb4-938e75106e2b:23",
+                "index": 23,
+                "kind": "assertion",
+                "api": "expect.toBeVisible",
+                "label": "getByText(\"Sketch to Render\").first()",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:12.774Z",
+                "durationMs": 5,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 30,
+                  "column": 118
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "e1e1acf3a7872866aac922893e537c13881628e21a20219f9267cff7997b5d9d",
+        "testId": "tests/e2e/t03-onboarding.e2e.ts::skip%20onboarding%20dismisses%20for%20good",
+        "kind": "test",
+        "declarationIndex": 1,
+        "titlePath": [
+          "skip onboarding dismisses for good"
+        ],
+        "file": "tests/e2e/t03-onboarding.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t03-onboarding.e2e.ts",
+          "line": 33,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": true,
+        "status": "passed",
+        "attempts": [
+          {
+            "id": "01a111dd-871c-7a65-8756-13511f5862e0",
+            "index": 0,
+            "status": "passed",
+            "startedAt": "2026-10-06T15:38:13.149Z",
+            "durationMs": 3904,
+            "artifacts": [
+              {
+                "id": "01a111dd-871c-7a65-8756-13511f5862e0:artifact:0",
+                "kind": "trace",
+                "mediaType": "application/zip",
+                "redaction": "not-required",
+                "producer": {
+                  "kind": "attempt"
+                },
+                "path": "web/tests_e2e_t03-onboarding.e2e.ts__skip_20onboarding_20dismisses_20for_20good-41e48ed4/default/attempt-0/trace/trace.zip",
+                "size": 4002163,
+                "sha256": "2fe2f8e2980cc4f02b35c44ad38838204b0c8834134350ccd906e061322484d2"
+              }
+            ],
+            "secondaryErrors": [],
+            "cleanup": "complete",
+            "steps": [
+              {
+                "id": "01a111dd-871c-7a65-8756-13511f5862e0:0",
+                "index": 0,
+                "kind": "resource",
+                "api": "browser.goto",
+                "label": "http://localhost:3200/studio/prj_luno00bn4do1txbc?tour=1",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:13.188Z",
+                "durationMs": 1186,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/helpers.ts",
+                  "line": 67,
+                  "column": 17
+                }
+              },
+              {
+                "id": "01a111dd-871c-7a65-8756-13511f5862e0:1",
+                "index": 1,
+                "kind": "locator",
+                "api": "locator.waitFor",
+                "label": "locator(\"[data-tour=\\\"rail\\\"]\") → visible",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:14.375Z",
+                "durationMs": 32,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/helpers.ts",
+                  "line": 68,
+                  "column": 47
+                }
+              },
+              {
+                "id": "01a111dd-871c-7a65-8756-13511f5862e0:2",
+                "index": 2,
+                "kind": "locator",
+                "api": "locator.click",
+                "label": "getByRole(\"button\", name: \"Skip onboarding\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:14.407Z",
+                "durationMs": 87,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 36,
+                  "column": 65
+                }
+              },
+              {
+                "id": "01a111dd-871c-7a65-8756-13511f5862e0:3",
+                "index": 3,
+                "kind": "assertion",
+                "api": "expect.not.toBeVisible",
+                "label": "getByText(\"Welcome to Fashion Studio\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:14.494Z",
+                "durationMs": 1028,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 37,
+                  "column": 67
+                }
+              },
+              {
+                "id": "01a111dd-871c-7a65-8756-13511f5862e0:4",
+                "index": 4,
+                "kind": "resource",
+                "api": "browser.reload",
+                "label": "",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:15.523Z",
+                "durationMs": 137,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 38,
+                  "column": 17
+                }
+              },
+              {
+                "id": "01a111dd-871c-7a65-8756-13511f5862e0:5",
+                "index": 5,
+                "kind": "locator",
+                "api": "locator.waitFor",
+                "label": "locator(\"[data-tour=\\\"rail\\\"]\") → visible",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:15.660Z",
+                "durationMs": 151,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 39,
+                  "column": 47
+                }
+              },
+              {
+                "id": "01a111dd-871c-7a65-8756-13511f5862e0:6",
+                "index": 6,
+                "kind": "assertion",
+                "api": "expect.not.toBeVisible",
+                "label": "getByText(\"Welcome to Fashion Studio\")",
+                "status": "passed",
+                "startedAt": "2026-10-06T15:38:15.811Z",
+                "durationMs": 1071,
+                "events": [],
+                "artifacts": [],
+                "source": {
+                  "file": "tests/e2e/t03-onboarding.e2e.ts",
+                  "line": 40,
+                  "column": 67
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ca2e605fa5491c68ac0390906d72f7d0845d249d4d189111f565b0abb93f2e6e",
+        "testId": "tests/e2e/t04-editor.e2e.ts::crop%20saves%20a%20new%20version",
+        "kind": "test",
+        "declarationIndex": 0,
+        "titlePath": [
+          "crop saves a new version"
+        ],
+        "file": "tests/e2e/t04-editor.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t04-editor.e2e.ts",
+          "line": 14,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "0acc693aa4b5de26cedb9c8ac4dc548efcae315a9e390f65c8ffc0b44510d24c",
+        "testId": "tests/e2e/t04-editor.e2e.ts::adjustments%20save%20a%20new%20version",
+        "kind": "test",
+        "declarationIndex": 1,
+        "titlePath": [
+          "adjustments save a new version"
+        ],
+        "file": "tests/e2e/t04-editor.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t04-editor.e2e.ts",
+          "line": 31,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "df940b3f9dab75394770aac96ff80aa651b11c1103447abe8b11ee17036109c2",
+        "testId": "tests/e2e/t04-editor.e2e.ts::draw%2C%20shapes%20and%20text%20annotate%20the%20image",
+        "kind": "test",
+        "declarationIndex": 2,
+        "titlePath": [
+          "draw, shapes and text annotate the image"
+        ],
+        "file": "tests/e2e/t04-editor.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t04-editor.e2e.ts",
+          "line": 47,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "d8030dfc3ee3d23b3928fb055764d14a850eb3f6634b27e69163745a3783d4ca",
+        "testId": "tests/e2e/t04-editor.e2e.ts::lasso%20and%20square%20selections%20open%20the%20change%20bubble",
+        "kind": "test",
+        "declarationIndex": 3,
+        "titlePath": [
+          "lasso and square selections open the change bubble"
+        ],
+        "file": "tests/e2e/t04-editor.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t04-editor.e2e.ts",
+          "line": 70,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "2ba2f33a887a18fc87a4437f46a854f1d8eaed9b336ee2c58f4775978d4ae7e1",
+        "testId": "tests/e2e/t04-editor.e2e.ts::zoom%20menu%20changes%20the%20zoom%20level",
+        "kind": "test",
+        "declarationIndex": 4,
+        "titlePath": [
+          "zoom menu changes the zoom level"
+        ],
+        "file": "tests/e2e/t04-editor.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t04-editor.e2e.ts",
+          "line": 91,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "675057f71ef3d303a81956ae3559ae4f4e310ef845e4a764ecab49141802acd9",
+        "testId": "tests/e2e/t05-generation.e2e.ts::invalid%20runs%20are%20rejected%20before%20any%20credits%20move",
+        "kind": "test",
+        "declarationIndex": 0,
+        "titlePath": [
+          "invalid runs are rejected before any credits move"
+        ],
+        "file": "tests/e2e/t05-generation.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t05-generation.e2e.ts",
+          "line": 6,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "fc43500fe135a2983af64d3618be9896ab3f6c4417b3a0550326230a2babfed3",
+        "testId": "tests/e2e/t05-generation.e2e.ts::blocked%20models%20stop%20a%20tool%20and%20show%20the%20workspace%20warning",
+        "kind": "test",
+        "declarationIndex": 1,
+        "titlePath": [
+          "blocked models stop a tool and show the workspace warning"
+        ],
+        "file": "tests/e2e/t05-generation.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t05-generation.e2e.ts",
+          "line": 19,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "1a4e70757b69922b524890fa2b9c2292ce949e1decc34b4399a25f8b86d43a25",
+        "testId": "tests/e2e/t06-feed.e2e.ts::feed%20groups%20runs%20and%20multi-select%20opens%20the%20action%20panel",
+        "kind": "test",
+        "declarationIndex": 0,
+        "titlePath": [
+          "feed groups runs and multi-select opens the action panel"
+        ],
+        "file": "tests/e2e/t06-feed.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t06-feed.e2e.ts",
+          "line": 5,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "80c7af4c417c67c5b4e0d96b696ae1d7ed9eda9b50c11fe2c38d77df4e5f2767",
+        "testId": "tests/e2e/t06-feed.e2e.ts::share%20link%20opens%20a%20public%20page%20that%20collects%20review%20comments",
+        "kind": "test",
+        "declarationIndex": 1,
+        "titlePath": [
+          "share link opens a public page that collects review comments"
+        ],
+        "file": "tests/e2e/t06-feed.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t06-feed.e2e.ts",
+          "line": 25,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "ebbcf1fb585878996a691fee70ff21722deab65e0db3c8577043c81f83fef956",
+        "testId": "tests/e2e/t06-feed.e2e.ts::deleting%20a%20result%20removes%20it%20from%20the%20feed",
+        "kind": "test",
+        "declarationIndex": 2,
+        "titlePath": [
+          "deleting a result removes it from the feed"
+        ],
+        "file": "tests/e2e/t06-feed.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t06-feed.e2e.ts",
+          "line": 44,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "e8cb14f45df19c7c3f4faa8815b1318d1072bdc2da2b499bca097b9f1eda3c21",
+        "testId": "tests/e2e/t07-hardening.e2e.ts::health%20reports%20db%2C%20storage%20and%20engine",
+        "kind": "test",
+        "declarationIndex": 0,
+        "titlePath": [
+          "health reports db, storage and engine"
+        ],
+        "file": "tests/e2e/t07-hardening.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t07-hardening.e2e.ts",
+          "line": 5,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "d409c6ac6efe23eaeae4db328e9c31531b0c8f9ae0755223f6afc8ef4e56c581",
+        "testId": "tests/e2e/t07-hardening.e2e.ts::file%20route%20rejects%20traversal%20and%20unknown%20keys",
+        "kind": "test",
+        "declarationIndex": 1,
+        "titlePath": [
+          "file route rejects traversal and unknown keys"
+        ],
+        "file": "tests/e2e/t07-hardening.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t07-hardening.e2e.ts",
+          "line": 12,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "cf57aa6d804aef65e34cc5199478cc31a2132a8f16c7a687a885f40f48e775c8",
+        "testId": "tests/e2e/t07-hardening.e2e.ts::projects%20are%20isolated%3A%20unknown%20ids%20404%2C%20foreign%20masks%20rejected",
+        "kind": "test",
+        "declarationIndex": 2,
+        "titlePath": [
+          "projects are isolated: unknown ids 404, foreign masks rejected"
+        ],
+        "file": "tests/e2e/t07-hardening.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t07-hardening.e2e.ts",
+          "line": 19,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "aa24b5a1980f69935c80e349330df54220d77883df0d7a294ec8d22fb4b50ee1",
+        "testId": "tests/e2e/t07-hardening.e2e.ts::uploads%20reject%20non-images",
+        "kind": "test",
+        "declarationIndex": 3,
+        "titlePath": [
+          "uploads reject non-images"
+        ],
+        "file": "tests/e2e/t07-hardening.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t07-hardening.e2e.ts",
+          "line": 31,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      },
+      {
+        "id": "b4a8cee45db6bad2481917280016393bf67d4a004052c280f62898612752ff75",
+        "testId": "tests/e2e/t07-hardening.e2e.ts::tour%20seeding%20is%20idempotent",
+        "kind": "test",
+        "declarationIndex": 4,
+        "titlePath": [
+          "tour seeding is idempotent"
+        ],
+        "file": "tests/e2e/t07-hardening.e2e.ts",
+        "source": {
+          "file": "tests/e2e/t07-hardening.e2e.ts",
+          "line": 39,
+          "column": 1
+        },
+        "targetId": "web",
+        "platform": "web",
+        "agent": "default",
+        "repeat": 0,
+        "tags": [],
+        "selected": false,
+        "status": "skipped",
+        "skip": {
+          "cause": "filtered",
+          "reason": "file not selected by a positional argument"
+        },
+        "attempts": []
+      }
+    ],
+    "errors": [],
+    "summary": {
+      "discovered": 26,
+      "selected": 2,
+      "executed": 2,
+      "passed": 2,
+      "failed": 0,
+      "interrupted": 0,
+      "flaky": 0,
+      "skipped": 0
+    },
+    "limits": {
+      "maxAgentContextBytes": 16384,
+      "maxLedgerBytes": 8192,
+      "maxObservationBytes": 262144,
+      "maxEventsPerStep": 1000,
+      "maxModelTokensPerCall": 64000
+    },
+    "usage": {
+      "discoveredResults": 26,
+      "maxAgentContextBytes": 0,
+      "maxLedgerBytes": 0,
+      "maxObservationBytes": 0,
+      "artifactBytes": 13421578,
+      "downloads": 0,
+      "events": 0,
+      "modelTokens": 0,
+      "maxModelCallsInStep": 0,
+      "maxActionStepsInStep": 0
+    }
+  }
+}

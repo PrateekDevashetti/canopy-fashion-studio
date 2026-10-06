@@ -46,6 +46,7 @@ export function Studio({ projectId }: { projectId: string }) {
     if (s.view === "feed") url.searchParams.set("view", "feed");
     else url.searchParams.delete("view");
     url.searchParams.delete("tool");
+    url.searchParams.delete("tour");
     window.history.replaceState(null, "", url);
   }, [s.view, s.loaded]);
 
@@ -150,6 +151,14 @@ export function Studio({ projectId }: { projectId: string }) {
         <HelpButton rightOpen={rightOpen} />
         <Toasts />
         <Onboarding />
+        {/* The editor is a desktop tool (like the reference); small screens get a clear note instead of a broken layout. */}
+        <div className="fixed inset-0 z-[99] flex flex-col items-center justify-center gap-3 bg-black/95 p-8 text-center min-[900px]:hidden">
+          <p className="text-[16px] font-medium text-fg">Fashion Studio works best on a larger screen</p>
+          <p className="max-w-[320px] text-[13.5px] leading-[1.5] text-dim">Open this project on a laptop or desktop to use the editor. Your work is saved and synced.</p>
+          <a href="/studios" className="btn mt-2 h-11 px-5">
+            Back to projects
+          </a>
+        </div>
         {dragging && (
           <div className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center bg-black/55 backdrop-blur-[1px]">
             <div className="rounded-[16px] border border-dashed border-accent/70 bg-black/60 px-8 py-6 text-[14px] text-fg">Drop images to add them to this project</div>

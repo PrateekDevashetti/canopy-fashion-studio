@@ -5,8 +5,8 @@ import { getAsset, insertAsset, refundCredits } from "../data";
 import { newId } from "../ids";
 import { extFor, getObjectBuffer, putObject } from "../storage";
 import { EDITOR_OPS, toolById } from "../tools/registry";
-import { compositeMasked, cropToMask, dims, highlightRegion, toDataUri } from "./imaging";
-import { download, falRun, falSubmit, falWait, ProviderError, type QueueRef } from "./providers";
+import { chromaKey, compositeMasked, cropToMask, dims, highlightRegion, maskCoverage, toDataUri } from "./imaging";
+import { download, falRun, falSubmit, falWait, openrouterImage, ProviderError, providerDown, tripIfFatal, type QueueRef } from "./providers";
 import { ANGLES, P, SHOOT_SHOTS } from "./prompts";
 import sharp from "sharp";
 
@@ -50,28 +50,113 @@ function aspectFor(settings: Settings, allowAuto: boolean) {
   return a;
 }
 
-/** Nano Banana 2 image generation/edit with a v1 fallback. */
-export async function generateImages(prompt: string, images: Buffer[], settings: Settings, n = 1): Promise<Buffer[]> {
-  const uris = await Promise.all(images.map((b) => toDataUri(b)));
-  const resolution = ["1K", "2K", "4K"].includes(settings.resolution ?? "") ? settings.resolution : "1K";
-  const base = { prompt, num_images: n, output_format: "png", aspect_ratio: aspectFor(settings, uris.length > 0) };
-  let out: FalImages;
-  try {
-    out = uris.length ? await falRun<FalImages>(NB2_EDIT, { ...base, image_urls: uris, resolution }) : await falRun<FalImages>(NB2, { ...base, resolution });
-  } catch (e) {
-    if (e instanceof ProviderError && e.status === 422) throw e; // content/validation — don't mask it
-    out = uris.length ? await falRun<FalImages>(NB_FALLBACK_EDIT, { ...base, image_urls: uris }) : await falRun<FalImages>(NB_FALLBACK, base);
-  }
+const ASPECTS: [string, number][] = [["1:1", 1], ["4:5", 0.8], ["3:4", 0.75], ["2:3", 2 / 3], ["9:16", 9 / 16], ["5:4", 1.25], ["4:3", 4 / 3], ["3:2", 1.5], ["16:9", 16 / 9]];
+export const nearestAspect = (r: number) => ASPECTS.reduce((a, b) => (Math.abs(Math.log(b[1] / r)) < Math.abs(Math.log(a[1] / r)) ? b : a))[0];
+
+const isPolicy = (e: unknown) => e instanceof ProviderError && (e.status === 422 || /content.?polic|flagged|safety/i.test(e.message));
+
+async function falImages(endpoint: string, input: Record<string, unknown>): Promise<Buffer[]> {
+  const out = await falRun<FalImages>(endpoint, input);
   const urls = out.images?.map((i) => i.url) ?? (out.image ? [out.image.url] : []);
   if (!urls.length) throw new ProviderError("The model returned no image. Try rephrasing or a different input.", 502);
   return Promise.all(urls.map(async (u) => (await download(u)).buf));
 }
 
-const one = async (prompt: string, images: Buffer[], settings: Settings) => (await generateImages(prompt, images, settings, 1))[0];
+/**
+ * Model tiers (chosen per tool — see docs/PRD.md §5):
+ * - pro:      Nano Banana Pro (Gemini 3 Pro Image) — identity, structure and material fidelity.
+ * - fast:     Nano Banana 2 (Gemini 3.1 Flash Image) — quick, faithful local edits.
+ * - seedream: Seedream 4.5 — strongest multi-reference blending for new design concepts.
+ * Every tier falls through fal → OpenRouter → the next tier down, skipping out-of-balance providers.
+ */
+export type Tier = "pro" | "fast" | "seedream";
+
+type Step = { provider: "fal" | "openrouter"; run: (ctx: { prompt: string; uris: string[]; n: number; aspect: string; resolution: string }) => Promise<Buffer[]> };
+
+const falNB = (t2i: string, edit: string, withRes = true): Step => ({
+  provider: "fal",
+  run: ({ prompt, uris, n, aspect, resolution }) => falImages(uris.length ? edit : t2i, { prompt, num_images: n, output_format: "png", aspect_ratio: aspect, ...(uris.length ? { image_urls: uris } : {}), ...(withRes ? { resolution } : {}) }),
+});
+const orNB = (model: string): Step => ({
+  provider: "openrouter",
+  run: async ({ prompt, uris, n, aspect, resolution }) =>
+    (await Promise.all(Array.from({ length: n }, () => openrouterImage(prompt, uris, { model, aspect: aspect === "auto" ? undefined : aspect, size: resolution })))).map((x) => x[0]),
+});
+const SEEDREAM_SIZE: Record<string, string> = { "1:1": "square_hd", "4:5": "portrait_4_3", "3:4": "portrait_4_3", "2:3": "portrait_16_9", "9:16": "portrait_16_9", "16:9": "landscape_16_9", "4:3": "landscape_4_3", "3:2": "landscape_4_3", "5:4": "landscape_4_3" };
+const seedream: Step = {
+  provider: "fal",
+  run: ({ prompt, uris, n, aspect }) => falImages("fal-ai/bytedance/seedream/v4.5/edit", { prompt, image_urls: uris, num_images: n, image_size: SEEDREAM_SIZE[aspect] ?? "auto_2K", enable_safety_checker: true }),
+};
+
+const PRO: Step[] = [falNB("fal-ai/nano-banana-pro", "fal-ai/nano-banana-pro/edit"), orNB("google/gemini-3-pro-image")];
+const FAST: Step[] = [falNB(NB2, NB2_EDIT), orNB("google/gemini-3.1-flash-image"), falNB(NB_FALLBACK, NB_FALLBACK_EDIT, false)];
+const CHAINS: Record<Tier, Step[]> = { pro: [...PRO, ...FAST], fast: FAST, seedream: [seedream, ...PRO, ...FAST] };
+
+export async function generateImages(prompt: string, images: Buffer[], settings: Settings, n = 1, tier: Tier = "fast"): Promise<Buffer[]> {
+  const uris = await Promise.all(images.map((b) => toDataUri(b)));
+  const resolution = ["1K", "2K", "4K"].includes(settings.resolution ?? "") ? settings.resolution! : "1K";
+  const aspect = aspectFor(settings, uris.length > 0);
+  // Seedream needs at least one reference; without one, start from the Pro chain.
+  const chain = tier === "seedream" && !uris.length ? CHAINS.pro : CHAINS[tier];
+  let last: unknown = null;
+  for (const step of chain) {
+    if (providerDown(step.provider)) continue;
+    try {
+      return await step.run({ prompt, uris, n, aspect, resolution });
+    } catch (e) {
+      last = e;
+      if (isPolicy(e)) throw e; // content/validation — another provider won't help
+      tripIfFatal(step.provider, e);
+      console.warn(`[engine] ${step.provider} step failed, trying next:`, (e as Error).message.slice(0, 160));
+    }
+  }
+  throw last ?? new ProviderError("No image provider is available right now.", 503);
+}
+
+const one = async (prompt: string, images: Buffer[], settings: Settings, tier: Tier = "fast") => (await generateImages(prompt, images, settings, 1, tier))[0];
+
+/** FASHN v1.6 — a dedicated virtual try-on model: keeps prints, logos and fit; falls back to Nano Banana Pro. */
+async function tryOn(model: Buffer, garment: Buffer, settings: Settings, fallbackPrompt: string): Promise<Buffer> {
+  if (!providerDown("fal")) {
+    try {
+      const out = await falImages("fal-ai/fashn/tryon/v1.6", {
+        model_image: await toDataUri(model),
+        garment_image: await toDataUri(garment),
+        category: "auto",
+        mode: "quality",
+        garment_photo_type: "auto",
+        moderation_level: "permissive",
+        num_samples: 1,
+        output_format: "png",
+      });
+      return out[0];
+    } catch (e) {
+      if (isPolicy(e)) throw e;
+      tripIfFatal("fal", e);
+      console.warn("[engine] FASHN failed, using Nano Banana Pro:", (e as Error).message.slice(0, 120));
+    }
+  }
+  return one(fallbackPrompt, [model, garment], settings, "pro");
+}
 
 async function removeBackground(buf: Buffer): Promise<Buffer> {
-  const out = await falRun<{ image: { url: string } }>("fal-ai/birefnet/v2", { image_url: await toDataUri(buf, 2048, true), output_format: "png", refine_foreground: true });
-  return (await download(out.image.url)).buf;
+  if (!providerDown("fal")) {
+    try {
+      const out = await falRun<{ image: { url: string } }>("fal-ai/birefnet/v2", { image_url: await toDataUri(buf, 2048, true), output_format: "png", refine_foreground: true });
+      return (await download(out.image.url)).buf;
+    } catch (e) {
+      tripIfFatal("fal", e);
+      console.warn("[engine] birefnet failed, using Gemini chroma-key fallback:", (e as Error).message.slice(0, 120));
+    }
+  }
+  // Fallback: have Gemini isolate the subject on pure chroma green (same framing), then key it out.
+  const { width, height } = await dims(buf);
+  const [green] = await openrouterImage(
+    "Keep the main subject exactly as it is (same position, scale, framing, shape, colors and details) and replace the entire background with a perfectly flat pure chroma-key green (#00FF00). Do not crop, zoom or move the subject. No shadows on the background, no green spill on the subject.",
+    [await toDataUri(buf)],
+    { aspect: nearestAspect(width / height) },
+  );
+  return chromaKey(green, buf);
 }
 
 async function video(run: RunRow, endpoint: string, input: Record<string, unknown>): Promise<Buffer> {
@@ -100,12 +185,12 @@ async function execute(ctx: Ctx) {
   switch (run.tool) {
     case "prompt": {
       const refs = await imgs("references");
-      const out = await one(P.prompt(text("prompt"), refs.length > 0), refs.map((r) => r.buf), settings);
+      const out = await one(P.prompt(text("prompt"), refs.length > 0), refs.map((r) => r.buf), settings, "pro");
       return emit(png(out, "Prompt"));
     }
     case "sketch-to-render": {
       const sketches = await imgs("sketch");
-      await Promise.all(sketches.map(async (s) => emit(png(await one(P.sketchToRender(text("direction")), [s.buf], settings), "Sketch to render", s.id))));
+      await Promise.all(sketches.map(async (s) => emit(png(await one(P.sketchToRender(text("direction")), [s.buf], settings, "pro"), "Sketch to render", s.id))));
       return;
     }
     case "garment-extractor": {
@@ -113,18 +198,18 @@ async function execute(ctx: Ctx) {
       const mask = await loadMask(pid, i.mask);
       const label = text("maskLabel");
       const refs = mask ? [outfit.buf, await highlightRegion(outfit.buf, mask), await cropToMask(outfit.buf, mask)] : [outfit.buf];
-      return emit(png(await one(P.extract(label), refs, settings), label ? `${label} extracted` : "Garment extracted", outfit.id));
+      return emit(png(await one(P.extract(label), refs, settings, "pro"), label ? `${label} extracted` : "Garment extracted", outfit.id));
     }
     case "concept": {
       const refs = await imgs("references");
-      await Promise.all([0, 1, 2, 3].map(async (v) => emit(png(await one(P.concept(text("direction"), v), refs.map((r) => r.buf), settings), "Concept"))));
+      await Promise.all([0, 1, 2, 3].map(async (v) => emit(png(await one(P.concept(text("direction"), v), refs.map((r) => r.buf), settings, "seedream"), "Concept"))));
       return;
     }
     case "ghostform":
     case "flatlay": {
       const garments = await imgs("garment");
       const prompt = run.tool === "ghostform" ? P.ghostform() : P.flatlay();
-      await Promise.all(garments.map(async (g) => emit(png(await one(prompt, [g.buf], settings), run.tool === "ghostform" ? "Ghostform" : "Flatlay", g.id))));
+      await Promise.all(garments.map(async (g) => emit(png(await one(prompt, [g.buf], settings, "pro"), run.tool === "ghostform" ? "Ghostform" : "Flatlay", g.id))));
       return;
     }
     case "garment-recolor": {
@@ -132,11 +217,12 @@ async function execute(ctx: Ctx) {
       const mask = await loadMask(pid, i.mask);
       const label = text("maskLabel");
       const colors = (Array.isArray(i.colors) ? i.colors : []) as { hex: string; name?: string }[];
+      const partMask = mask ? (await maskCoverage(mask)) < 0.18 : false;
       await Promise.all(
         colors.map(async (c) => {
           const refs = mask ? [g.buf, await highlightRegion(g.buf, mask)] : [g.buf];
-          let out = await one(P.recolor(c, !!mask, label), refs, settings);
-          if (mask) out = await compositeMasked(g.buf, out, mask, { dilate: 2 });
+          let out = await one(P.recolor(c, !!mask, label), refs, settings, "fast");
+          if (mask && partMask) out = await compositeMasked(g.buf, out, mask, { dilate: 2 });
           await emit(png(out, `Recolor ${c.name ?? c.hex}`, g.id));
         }),
       );
@@ -147,11 +233,12 @@ async function execute(ctx: Ctx) {
       const fabrics = await imgs("fabric");
       const mask = await loadMask(pid, i.mask);
       const label = text("maskLabel");
+      const partMask = mask ? (await maskCoverage(mask)) < 0.18 : false;
       await Promise.all(
         fabrics.map(async (f) => {
           const refs = mask ? [g.buf, f.buf, await highlightRegion(g.buf, mask)] : [g.buf, f.buf];
-          let out = await one(P.fabric(!!mask, label), refs, settings);
-          if (mask) out = await compositeMasked(g.buf, out, mask, { dilate: 3 });
+          let out = await one(P.fabric(!!mask, label), refs, settings, "pro");
+          if (mask && partMask) out = await compositeMasked(g.buf, out, mask, { dilate: 3 });
           await emit(png(out, "Fabric swap", g.id));
         }),
       );
@@ -159,18 +246,18 @@ async function execute(ctx: Ctx) {
     }
     case "model-maker": {
       const [ref] = await imgs("reference");
-      const head = await one(P.modelHeadshot(text("description"), !!ref), ref ? [ref.buf] : [], { ...settings, aspect: "4:5" });
+      const head = await one(P.modelHeadshot(text("description"), !!ref), ref ? [ref.buf] : [], { ...settings, aspect: "4:5" }, "pro");
       await emit(png(head, "Headshot"));
       await Promise.all([
-        (async () => emit(png(await one(P.modelHeadshotSheet(), [head], { ...settings, aspect: "16:9" }), "Headshot sheet")))(),
-        (async () => emit(png(await one(P.modelBodySheet(), [head], { ...settings, aspect: "16:9" }), "Body sheet")))(),
+        (async () => emit(png(await one(P.modelHeadshotSheet(), [head], { ...settings, aspect: "16:9" }, "pro"), "Headshot sheet")))(),
+        (async () => emit(png(await one(P.modelBodySheet(), [head], { ...settings, aspect: "16:9" }, "pro"), "Body sheet")))(),
       ]);
       return;
     }
     case "model-try-on": {
       const garments = await imgs("garment");
       const [model] = await imgs("model");
-      await Promise.all(garments.map(async (g) => emit(png(await one(P.tryOn(), [model.buf, g.buf], settings), "Try-on", model.id))));
+      await Promise.all(garments.map(async (g) => emit(png(await tryOn(model.buf, g.buf, settings, P.tryOn()), "Try-on", model.id))));
       return;
     }
     case "garment-swap": {
@@ -178,46 +265,62 @@ async function execute(ctx: Ctx) {
       const [garment] = await imgs("garment");
       const mask = await loadMask(pid, i.mask);
       const label = text("maskLabel");
+      // With a garment image, FASHN swaps it in directly; a written description goes through Nano Banana Pro.
+      if (garment) return emit(png(await tryOn(base.buf, garment.buf, settings, P.garmentSwap(label)), "Garment swap", base.id));
       const marked = mask ? await highlightRegion(base.buf, mask) : base.buf;
-      const refs = garment ? [base.buf, marked, garment.buf] : [base.buf, marked];
-      let out = await one(P.garmentSwap(label, garment ? undefined : text("description")), refs, settings);
+      let out = await one(P.garmentSwap(label, text("description")), [base.buf, marked], settings, "pro");
       if (mask) out = await compositeMasked(base.buf, out, mask, { dilate: 10 });
       return emit(png(out, "Garment swap", base.id));
     }
     case "photo-shoot": {
       const [look] = await imgs("look");
-      await Promise.all(SHOOT_SHOTS.map(async (shot) => emit(png(await one(P.photoShoot(text("location"), shot), [look.buf], settings), "Photo shoot", look.id))));
+      await Promise.all(SHOOT_SHOTS.map(async (shot) => emit(png(await one(P.photoShoot(text("location"), shot), [look.buf], settings, "pro"), "Photo shoot", look.id))));
       return;
     }
     case "multi-angle": {
       const [shot] = await imgs("shot");
-      await Promise.all(ANGLES.map(async (a) => emit(png(await one(P.angle(a.prompt), [shot.buf], settings), a.name, shot.id))));
+      await Promise.all(ANGLES.map(async (a) => emit(png(await one(P.angle(a.prompt), [shot.buf], settings, "pro"), a.name, shot.id))));
       return;
     }
     case "garment-360":
     case "model-360": {
       const key = run.tool === "garment-360" ? "garment" : "look";
-      const [front] = await imgs(key);
-      const [back] = run.tool === "garment-360" ? await imgs("back") : [];
+      const [frontImg] = await imgs(key);
+      const [backImg] = run.tool === "garment-360" ? await imgs("back") : [];
+      const front = { ...frontImg, uri: await toDataUri(frontImg.buf) };
+      const back = backImg ? { uri: await toDataUri(backImg.buf) } : null;
       const res = settings.resolution === "720p" ? "720p" : "1080p";
       const aspect = ["16:9", "9:16"].includes(settings.aspect ?? "") ? settings.aspect : "auto";
-      const buf = back
-        ? await video(run, "fal-ai/kling-video/v2.5-turbo/pro/image-to-video", { prompt: P.garment360(true), image_url: await toDataUri(front.buf), tail_image_url: await toDataUri(back.buf), duration: "10" })
-        : await video(run, "fal-ai/veo3.1/fast/image-to-video", {
-            prompt: run.tool === "garment-360" ? P.garment360(false) : P.model360(),
-            image_url: await toDataUri(front.buf),
-            aspect_ratio: aspect,
-            resolution: res,
-            duration: "8s",
-            generate_audio: false,
-          });
+      const veo = (endpoint: string) =>
+        video(run, endpoint, { prompt: run.tool === "garment-360" ? P.garment360(false) : P.model360(), image_url: front.uri, aspect_ratio: aspect, resolution: res, duration: "8s", generate_audio: false });
+      const kling = (end?: string) => video(run, "fal-ai/kling-video/v3/pro/image-to-video", { prompt: run.tool === "garment-360" ? P.garment360(Boolean(end)) : P.model360(), start_image_url: front.uri, ...(end ? { end_image_url: end } : {}), duration: "10", generate_audio: false });
+      const tries: (() => Promise<Buffer>)[] = back
+        ? [() => kling(back.uri), () => veo("fal-ai/veo3.1/image-to-video")]
+        : run.tool === "garment-360"
+          ? [() => veo("fal-ai/veo3.1/image-to-video"), () => veo("fal-ai/veo3.1/fast/image-to-video"), () => kling()]
+          : [() => veo("fal-ai/veo3.1/fast/image-to-video"), () => kling()];
+      let buf: Buffer | null = null;
+      let lastErr: unknown = null;
+      for (const t of tries) {
+        try {
+          buf = await t();
+          break;
+        } catch (e) {
+          lastErr = e;
+          if (isPolicy(e) || providerDown("fal")) break;
+          tripIfFatal("fal", e);
+          await db().update(runs).set({ providerRef: {} }).where(eq(runs.id, run.id));
+          run.providerRef = {};
+        }
+      }
+      if (!buf) throw lastErr ?? new ProviderError("Video generation failed", 502);
       return emit({ buf, mime: "video/mp4", name: run.tool === "garment-360" ? "360 garment video" : "360 model video", posterKey: front.key, parentId: front.id });
     }
     case "region-edit": {
       const [img] = await imgs("image");
       const mask = await loadMask(pid, i.mask);
       if (!mask) throw new ProviderError("Select a region first.", 400);
-      const out = await one(P.regionEdit(text("prompt")), [img.buf, await highlightRegion(img.buf, mask)], { ...settings, aspect: "Auto" });
+      const out = await one(P.regionEdit(text("prompt")), [img.buf, await highlightRegion(img.buf, mask)], { ...settings, aspect: "Auto" }, "pro");
       return emit(png(await compositeMasked(img.buf, out, mask, { dilate: 2 }), "Region edited", img.id));
     }
     case "remove-background": {
@@ -280,6 +383,7 @@ function friendly(e: unknown): string {
   if (/safety|content.?policy|nsfw|blocked/i.test(msg)) return "The model declined this request. Try a different image or wording.";
   if (/timed out/i.test(msg)) return "The model took too long. Your credits were refunded — try again.";
   if (/FAL_KEY|OPENROUTER_API_KEY/.test(msg)) return "Generation is not configured on this server.";
+  if (/locked|exhausted balance|top.?up/i.test(msg)) return "This model provider is temporarily unavailable. Your credits were refunded — please try again later.";
   return msg.replace(/^fal-ai\/[\w./-]+:\s*/, "").slice(0, 300) || "Generation failed";
 }
 

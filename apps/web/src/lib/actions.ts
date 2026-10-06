@@ -1,6 +1,6 @@
 "use client";
 
-import { runCost, toolById, validateInputs, MODELS, EDITOR_OPS } from "@fashion/core/tools";
+import { batchSize, runCost, toolById, validateInputs, MODELS, EDITOR_OPS } from "@fashion/core/tools";
 import { api, downloadUrl, downloadZip, fileName, type AssetDTO, type RunDTO } from "./api";
 import { renderAdjusted, renderAnnotated, renderCrop, selectionEmpty, selectionMask } from "./render";
 import { useStudio, isPending } from "./store";
@@ -89,7 +89,7 @@ export async function generate(toolId: string) {
   const problem = validateInputs(tool, inputs);
   if (problem) return s.toast(problem, "error");
   const settings = { resolution: ts.resolution ?? tool.resolutions[0], aspect: ts.aspect ?? tool.defaultAspect };
-  const outputs = tool.outputs * Math.max(1, ...tool.inputs.map((sp) => ((sp.kind === "image" || sp.kind === "color") && sp.collection && Array.isArray(inputs[sp.key]) ? (inputs[sp.key] as unknown[]).length : 1)));
+  const outputs = tool.outputs * batchSize(tool, inputs);
   const cost = runCost(tool, inputs, settings.resolution);
   if ((s.me?.credits ?? 0) < cost) return s.toast(`Not enough credits — this run needs ${cost}.`, "error");
   return start(toolId, inputs, settings, outputs);

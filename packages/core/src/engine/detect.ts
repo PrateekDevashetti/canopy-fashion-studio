@@ -4,7 +4,7 @@ import { assets, type AssetRow, type Segment } from "../db/schema";
 import { newId } from "../ids";
 import { getObjectBuffer, putObject } from "../storage";
 import { binarizeMask, boxMask, dims, maskCoverage, toDataUri } from "./imaging";
-import { download, falRun, visionJson } from "./providers";
+import { download, falRun, openrouterImage, providerDown, tripIfFatal, visionJson } from "./providers";
 
 const VISION_MODEL = () => process.env.FASHION_VISION_MODEL ?? "google/gemini-3.6-flash";
 
@@ -18,9 +18,26 @@ Skip skin, hair, faces and background. Max 12 items.
 Return JSON: {"items":[{"label":"Orange jacket","box_2d":[ymin,xmin,ymax,xmax]}]} with integer coordinates normalized to 0-1000.`;
 
 /** Turn a detection box into a precise mask with SAM 3; falls back to a rounded rectangle. */
-async function maskFor(imageUri: string, size: { width: number; height: number }, d: Detection): Promise<Buffer> {
+async function maskFor(imageUri: string, size: { width: number; height: number }, d: Detection, allowGemini: boolean): Promise<Buffer> {
   const [y0, x0, y1, x1] = d.box_2d.map((v) => Math.min(1000, Math.max(0, v)) / 1000);
   const box = { x_min: Math.round(x0 * size.width), y_min: Math.round(y0 * size.height), x_max: Math.round(x1 * size.width), y_max: Math.round(y1 * size.height), object_id: 1 };
+  if (providerDown("fal")) {
+    if (allowGemini) {
+      try {
+        const [m] = await openrouterImage(
+          `Create a segmentation mask for "${d.label}" in this image: output the same framing and size, pure white (#FFFFFF) exactly where the ${d.label.toLowerCase()} is and pure black (#000000) everywhere else. No gray, no other content.`,
+          [imageUri],
+          {},
+        );
+        const mask = await binarizeMask(m, size);
+        const cov = await maskCoverage(mask);
+        if (cov > 0.001 && cov < 0.95) return mask;
+      } catch (e) {
+        console.warn(`[detect] Gemini mask failed for ${d.label}:`, (e as Error).message.slice(0, 120));
+      }
+    }
+    return boxMask(size, [x0, y0, x1, y1]);
+  }
   try {
     const out = await falRun<{ masks?: { url: string }[] }>(
       "fal-ai/sam-3/image",
@@ -34,7 +51,9 @@ async function maskFor(imageUri: string, size: { width: number; height: number }
       if (cov > 0.001 && cov < 0.98) return mask;
     }
   } catch (e) {
+    tripIfFatal("fal", e);
     console.warn(`[detect] SAM failed for ${d.label}:`, (e as Error).message);
+    if (providerDown("fal")) return maskFor(imageUri, size, d, allowGemini);
   }
   return boxMask(size, [x0, y0, x1, y1]);
 }
@@ -56,8 +75,9 @@ export async function detectGarments(asset: AssetRow, opts: { refresh?: boolean 
     .filter((d) => typeof d?.label === "string" && Array.isArray(d.box_2d) && d.box_2d.length === 4 && d.box_2d.every((n) => Number.isFinite(n)))
     .slice(0, 12);
   const segments = await Promise.all(
-    items.map(async (d) => {
-      const mask = await maskFor(uri, size, d);
+    items.map(async (d, i) => {
+      // Gemini masks (fallback path) are pricier: only for the main garments + first parts.
+      const mask = await maskFor(uri, size, d, i < 6);
       const id = newId("ast").replace("ast_", "seg_");
       const maskKey = `p/${asset.projectId}/masks/${id}.png`;
       await putObject(maskKey, mask);

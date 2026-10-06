@@ -141,6 +141,7 @@ export function Overlays({ asset, scale, disabled }: { asset: AssetDTO; scale: n
   const pt = usePoint(svg, W, H);
   const drawing = useRef<null | { kind: string; id?: string; start?: [number, number]; shift?: boolean }>(null);
   const [cursor, setCursor] = useState<[number, number] | null>(null);
+  const [, bump] = useState(0);
   const segs = Array.isArray(s.segments[asset.id]) ? (s.segments[asset.id] as SegmentDTO[]) : null;
   const hitTest = useSegmentHits(s.mode === "auto" ? segs : null);
   const [hover, setHover] = useState<SegmentDTO | null>(null);
@@ -167,8 +168,10 @@ export function Overlays({ asset, scale, disabled }: { asset: AssetDTO; scale: n
       const prev = sel?.kind === "brush" ? sel.strokes : [];
       s.set({ selection: { kind: "brush", strokes: [...prev, { points: [p], size: s.brush.size / scale, erase: s.brush.erase }] } });
     } else if (mode === "auto") {
-      if (hover) s.set({ selection: { kind: "segment", segment: hover } });
-      else s.set({ selection: null });
+      // Hit-test at the click itself — works without a prior hover (touch, fast clicks).
+      const r = svg.current!.getBoundingClientRect();
+      const hit = (segs && hitTest((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height)) || hover;
+      s.set({ selection: hit ? { kind: "segment", segment: hit } : null });
       return;
     } else if (mode === "draw") {
       const id = uid();
@@ -220,6 +223,8 @@ export function Overlays({ asset, scale, disabled }: { asset: AssetDTO; scale: n
     const d = drawing.current;
     drawing.current = null;
     if (!d) return;
+    // The ref change alone doesn't re-render; the bubble and closed lasso path depend on it.
+    bump((n) => n + 1);
     const cur = useStudio.getState().selection;
     if ((d.kind === "lasso" || d.kind === "square") && selectionEmpty(cur)) s.set({ selection: null });
     if (d.kind === "shape") setAnnItems((items) => items.filter((it) => !("to" in it) || it.id !== d.id || Math.hypot(it.to[0] - it.from[0], it.to[1] - it.from[1]) > 3));

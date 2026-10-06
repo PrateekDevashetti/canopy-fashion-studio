@@ -26,7 +26,11 @@ test("batching multiplies cost by collection size", () => {
   assert.equal(runCost(recolor, inputs, "1K"), 12);
   assert.equal(runCost(recolor, inputs, "4K"), 24);
   const maker = toolById("model-maker")!;
-  assert.equal(runCost(maker, { description: "x" }), 12);
+  assert.equal(runCost(maker, { description: "x" }), 18);
+  // References are blended into each output, never a batch axis.
+  const concept = toolById("concept")!;
+  assert.equal(batchSize(concept, { references: ["ast_a", "ast_b", "ast_c"] }), 1);
+  assert.equal(runCost(concept, { references: ["ast_a", "ast_b"], direction: "x" }), 16);
 });
 
 test("validation", () => {

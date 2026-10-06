@@ -6,16 +6,30 @@
 
 export type Section = "concept" | "refine" | "showcase";
 
-export type ModelId = "nano-banana-2" | "nano-banana-2-lite" | "gemini-flash-3-6" | "veo-3-1-fast" | "kling-video" | "sam-3" | "birefnet";
+export type ModelId =
+  | "nano-banana-pro"
+  | "nano-banana-2"
+  | "seedream-4-5"
+  | "fashn-tryon"
+  | "gemini-flash-3-6"
+  | "sam-3"
+  | "birefnet"
+  | "veo-3-1"
+  | "veo-3-1-fast"
+  | "kling-3";
 
-export const MODELS: Record<ModelId, { label: string; kind: "image" | "vision" | "video" | "matting" }> = {
-  "nano-banana-2": { label: "Nano Banana 2", kind: "image" },
-  "nano-banana-2-lite": { label: "Nano Banana 2 Lite", kind: "image" },
-  "gemini-flash-3-6": { label: "Gemini Flash 3.6", kind: "vision" },
-  "veo-3-1-fast": { label: "Veo 3.1 Fast", kind: "video" },
-  "kling-video": { label: "Kling 2.5 Turbo", kind: "video" },
-  "sam-3": { label: "SAM 3", kind: "vision" },
-  birefnet: { label: "BiRefNet Matting", kind: "matting" },
+/** Every model the studio can call, with why it was picked (see docs/PRD.md §5). */
+export const MODELS: Record<ModelId, { label: string; kind: "image" | "vision" | "video" | "matting" | "tryon"; why: string }> = {
+  "nano-banana-pro": { label: "Nano Banana Pro", kind: "image", why: "Highest fidelity edits: keeps identity, construction and materials." },
+  "nano-banana-2": { label: "Nano Banana 2", kind: "image", why: "Fast, faithful local edits such as recolors." },
+  "seedream-4-5": { label: "Seedream 4.5", kind: "image", why: "Best multi-reference blending for new concepts." },
+  "fashn-tryon": { label: "FASHN Try-On 1.6", kind: "tryon", why: "Purpose-built virtual try-on that keeps prints, logos and fit." },
+  "gemini-flash-3-6": { label: "Gemini Flash 3.6", kind: "vision", why: "Finds and names every garment part." },
+  "sam-3": { label: "SAM 3", kind: "vision", why: "Pixel-accurate garment masks." },
+  birefnet: { label: "BiRefNet", kind: "matting", why: "Clean cut-outs with fine fabric edges." },
+  "veo-3-1": { label: "Veo 3.1", kind: "video", why: "Smooth, consistent product turntables." },
+  "veo-3-1-fast": { label: "Veo 3.1 Fast", kind: "video", why: "Quick on-model orbits." },
+  "kling-3": { label: "Kling 3.0 Pro", kind: "video", why: "Start-to-end frame control for front-to-back spins." },
 };
 
 export type InputSpec =
@@ -30,8 +44,10 @@ export type InputSpec =
       bindActive?: boolean;
       /** May be submitted empty (no fallback to the open image). */
       allowEmpty?: boolean;
-      /** Collection inputs batch one generation per item. */
+      /** Collection inputs batch one generation per item… */
       collection?: boolean;
+      /** …unless they're blended together into each output (references). */
+      blend?: boolean;
       max?: number;
     }
   | { kind: "mask"; key: string; label: string; info?: string; of: string; optional?: boolean }
@@ -87,8 +103,8 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/prompt.png",
     preview: "/studio/previews/prompt.jpg",
     media: "image",
-    models: ["nano-banana-2"],
-    cost: 4,
+    models: ["nano-banana-pro"],
+    cost: 6,
     outputs: 1,
     inputs: [
       {
@@ -98,7 +114,7 @@ export const TOOLS: Tool[] = [
         placeholder: 'Try "An editorial shoot for tailored denim on a brutalist rooftop, overcast light"',
         rows: 4,
       },
-      { kind: "image", key: "references", label: "References", optional: true, allowEmpty: true, collection: true, max: 6 },
+      { kind: "image", key: "references", label: "References", optional: true, allowEmpty: true, collection: true, blend: true, max: 6 },
     ],
     resolutions: IMG_RES,
     aspects: ASPECTS.filter((a) => a !== "Auto"),
@@ -114,8 +130,8 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/sketch.png",
     preview: "/studio/previews/sketch.jpg",
     media: "image",
-    models: ["gemini-flash-3-6", "nano-banana-2-lite"],
-    cost: 4,
+    models: ["nano-banana-pro"],
+    cost: 6,
     outputs: 1,
     isNew: true,
     inputs: [
@@ -148,8 +164,8 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/extract.png",
     preview: "/studio/previews/extract.jpg",
     media: "image",
-    models: ["gemini-flash-3-6", "nano-banana-2"],
-    cost: 4,
+    models: ["gemini-flash-3-6", "sam-3", "nano-banana-pro"],
+    cost: 6,
     outputs: 1,
     inputs: [
       { kind: "image", key: "outfit", label: "Outfit", optional: true },
@@ -169,11 +185,11 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/concept.png",
     preview: "/studio/previews/concept.jpg",
     media: "image",
-    models: ["nano-banana-2"],
+    models: ["seedream-4-5", "nano-banana-pro"],
     cost: 4,
     outputs: 4,
     inputs: [
-      { kind: "image", key: "references", label: "References", info: "Moodboard images, swatches, silhouettes.", collection: true, max: 6, bindActive: true },
+      { kind: "image", key: "references", label: "References", info: "Moodboard images, swatches, silhouettes.", collection: true, blend: true, max: 6, bindActive: true },
       {
         kind: "text",
         key: "direction",
@@ -197,8 +213,8 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/ghost.png",
     preview: "/studio/previews/ghost.jpg",
     media: "image",
-    models: ["nano-banana-2"],
-    cost: 4,
+    models: ["nano-banana-pro"],
+    cost: 6,
     outputs: 1,
     inputs: [{ ...garment(), collection: true, max: 12 } as InputSpec],
     resolutions: IMG_RES,
@@ -215,8 +231,8 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/flat.png",
     preview: "/studio/previews/flat.jpg",
     media: "image",
-    models: ["nano-banana-2-lite"],
-    cost: 2,
+    models: ["nano-banana-pro"],
+    cost: 6,
     outputs: 1,
     inputs: [{ ...garment(), collection: true, max: 12 } as InputSpec],
     resolutions: IMG_RES,
@@ -256,8 +272,8 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/fabric.png",
     preview: "/studio/previews/fabric.jpg",
     media: "image",
-    models: ["nano-banana-2"],
-    cost: 4,
+    models: ["nano-banana-pro"],
+    cost: 6,
     outputs: 1,
     inputs: [
       { kind: "image", key: "garment", label: "Garment", optional: true },
@@ -278,8 +294,8 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/model.png",
     preview: "/studio/previews/model.jpg",
     media: "image",
-    models: ["nano-banana-2"],
-    cost: 4,
+    models: ["nano-banana-pro"],
+    cost: 6,
     outputs: 3,
     inputs: [
       {
@@ -306,8 +322,8 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/tryon.png",
     preview: "/studio/previews/tryon.jpg",
     media: "image",
-    models: ["nano-banana-2"],
-    cost: 4,
+    models: ["fashn-tryon"],
+    cost: 6,
     outputs: 1,
     inputs: [
       { kind: "image", key: "garment", label: "Garment", info: "Flatlay or ghostform.", bindActive: true, collection: true, max: 8 },
@@ -327,8 +343,8 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/swap.png",
     preview: "/studio/previews/swap.jpg",
     media: "image",
-    models: ["nano-banana-2"],
-    cost: 4,
+    models: ["fashn-tryon", "nano-banana-pro"],
+    cost: 6,
     outputs: 1,
     inputs: [
       { kind: "image", key: "base", label: "Base Model Photo", optional: true },
@@ -350,8 +366,8 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/photo.png",
     preview: "/studio/previews/photo.jpg",
     media: "image",
-    models: ["nano-banana-2"],
-    cost: 4,
+    models: ["nano-banana-pro"],
+    cost: 6,
     outputs: 4,
     inputs: [
       { kind: "image", key: "look", label: "Look", info: "The model wearing the garment.", bindActive: true },
@@ -378,8 +394,8 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/360.png",
     preview: "/studio/previews/360.jpg",
     media: "video",
-    models: ["veo-3-1-fast", "kling-video"],
-    cost: 30,
+    models: ["veo-3-1", "kling-3"],
+    cost: 40,
     outputs: 1,
     isNew: true,
     inputs: [
@@ -400,7 +416,7 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/orbit.png",
     preview: "/studio/previews/orbit.jpg",
     media: "video",
-    models: ["veo-3-1-fast"],
+    models: ["veo-3-1-fast", "kling-3"],
     cost: 30,
     outputs: 1,
     inputs: [{ kind: "image", key: "look", label: "Model", info: "A full-body photo of the model.", bindActive: true }],
@@ -418,8 +434,8 @@ export const TOOLS: Tool[] = [
     icon: "/studio/icons/angle.png",
     preview: "/studio/previews/angle.jpg",
     media: "image",
-    models: ["nano-banana-2"],
-    cost: 4,
+    models: ["nano-banana-pro"],
+    cost: 6,
     outputs: 4,
     inputs: [{ kind: "image", key: "shot", label: "Shot", info: "The image to reshoot from new angles.", bindActive: true }],
     resolutions: IMG_RES,
@@ -438,7 +454,7 @@ export const SOON: SoonTool[] = [
 
 /** Built-in editor operations that also land in the feed as runs. */
 export const EDITOR_OPS = {
-  "region-edit": { name: "Region Edit", label: "Region edited", cost: 4, models: ["nano-banana-2"] as ModelId[] },
+  "region-edit": { name: "Region Edit", label: "Region edited", cost: 6, models: ["nano-banana-pro"] as ModelId[] },
   "remove-background": { name: "Remove Background", label: "Background removed", cost: 1, models: ["birefnet"] as ModelId[] },
   crop: { name: "Crop", label: "Cropped", cost: 0, models: [] as ModelId[] },
   adjust: { name: "Adjustments", label: "Adjusted", cost: 0, models: [] as ModelId[] },
@@ -466,7 +482,7 @@ export function runLabel(tool: string): string {
 export function batchSize(tool: Tool, inputs: Record<string, unknown>): number {
   let n = 1;
   for (const spec of tool.inputs) {
-    if ((spec.kind === "image" || spec.kind === "color") && spec.collection) {
+    if ((spec.kind === "image" || spec.kind === "color") && spec.collection && !(spec.kind === "image" && spec.blend)) {
       const v = inputs[spec.key];
       if (Array.isArray(v) && v.length > 0) n = Math.max(n, v.length);
     }

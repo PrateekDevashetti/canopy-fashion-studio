@@ -86,27 +86,31 @@ Public read-only view of one result with download.
 
 ## 5. Tools → models
 
-| Tool | Inputs | Outputs | Model |
-|---|---|---|---|
-| Prompt | prompt, refs (opt) | 1 | fal Nano Banana 2 (t2i / edit) |
-| Sketch to Render | sketch[] , direction | 1 / sketch | Nano Banana 2 edit |
-| Garment Extractor | outfit, mask | 1 | Gemini 3.6 Flash (detect) + NB2 edit |
-| Concept | refs[], direction | 4 | NB2 edit |
-| Ghostform / Flatlay | garment[] | 1 / garment | NB2 edit |
-| Garment Recolor | garment, mask (opt), colors[] | 1 / color | NB2 edit + mask composite |
-| Fabric Swap | garment, mask (opt), swatches[] | 1 / swatch | NB2 edit + mask composite |
-| Model Maker | description, ref (opt) | 3 (headshot, headshot sheet, body sheet) | NB2 |
-| Model Try-On | garment[], model | 1 / garment | NB2 edit |
-| Garment Swap | base, mask, new garment or description | 1 | NB2 edit + mask composite |
-| Photo Shoot | look, location | 4 | NB2 edit |
-| 360 Garment Video | garment, backview (opt) | 1 video | Veo 3.1 Fast (Kling 2.5 w/ backview) |
-| 360 Model Video | model | 1 video | Veo 3.1 Fast |
-| Multi-Angle Shoot | shot | 4 | NB2 edit |
-| Region edit | image, mask, instruction | 1 | NB2 edit + mask composite |
-| Remove background | image | 1 | BiRefNet v2 |
-| Auto detect | image | regions | Gemini 3.6 Flash boxes → SAM 3 masks |
+Model choice per tool (2026-10-06). "Pro" = Nano Banana Pro (Gemini 3 Pro Image), "NB2" = Nano Banana 2
+(Gemini 3.1 Flash Image). Every image chain is fal first, then the same model via OpenRouter, then the next
+tier down; providers that are out of balance are skipped for 5 minutes.
 
-Fallbacks: NB2 → Nano Banana v1; SAM → box mask; worker → inline; stale runs → retry once → refund.
+| Tool | Outputs | Primary model | Why | Fallbacks |
+|---|---|---|---|---|
+| Prompt | 1 | Pro | Best prompt adherence and garment realism from text | Pro (OR) → NB2 |
+| Sketch to Render | 1 / sketch | Pro | Holds the sketch's silhouette and design lines while inventing believable fabric | Pro (OR) → NB2 |
+| Garment Extractor | 1 | Gemini 3.6 Flash + SAM 3 → Pro | Precise garment selection, then reconstruction of hidden parts | NB2 |
+| Concept | 4 | Seedream 4.5 | Strongest multi-reference blending for original design concepts | Pro → NB2 |
+| Ghostform / Flatlay | 1 / garment | Pro | 3D volume (ghost) and true top-down flattening without losing construction | NB2 |
+| Garment Recolor | 1 / color | NB2 (+ mask composite on parts) | Color-only edit; fast and faithful | NB1 |
+| Fabric Swap | 1 / swatch | Pro | Understands weave/knit, sheen and drape of the swatch | NB2 |
+| Model Maker | 3 | Pro | Identity stays consistent across headshot, headshot sheet, body sheet | NB2 |
+| Model Try-On | 1 / garment | FASHN Try-On 1.6 | Purpose-built virtual try-on: keeps prints, logos, fit | Pro |
+| Garment Swap | 1 | FASHN 1.6 (image) / Pro (description) | Same try-on model swaps the selected garment | Pro → NB2 |
+| Photo Shoot | 4 | Pro | Same model + outfit in a new location across shots | NB2 |
+| Multi-Angle Shoot | 4 | Pro | Most consistent subject across camera angles | NB2 |
+| 360 Garment Video | 1 video | Veo 3.1 (Kling 3.0 Pro start→end frames with a backview) | Smooth, consistent turntable | Veo 3.1 Fast → Kling 3.0 |
+| 360 Model Video | 1 video | Veo 3.1 Fast | Natural orbit around a standing model | Kling 3.0 Pro |
+| Region edit | 1 | Pro + feathered mask composite | Instruction-following edit; pixels outside the selection untouched | NB2 |
+| Remove background | 1 | BiRefNet v2 | Fine fabric edges | Gemini chroma-key |
+| Auto detect | regions | Gemini 3.6 Flash (OpenRouter) → SAM 3 masks | Named parts ("Left sleeve", "Collar"…) with pixel masks | Gemini masks → box masks |
+
+Other fallbacks: worker → inline engine; stale runs → retry once → refund unused credits.
 
 ## 6. Architecture
 npm workspaces: `apps/web` (Next.js 16 on Vercel: UI + REST API + inline engine fallback),

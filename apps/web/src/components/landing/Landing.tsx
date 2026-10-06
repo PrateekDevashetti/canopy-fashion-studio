@@ -92,9 +92,16 @@ function Nav() {
 }
 
 function Hero() {
+  const [still, setStill] = useState(false);
+  useEffect(() => setStill(window.matchMedia("(prefers-reduced-motion: reduce)").matches), []);
   return (
-    <section className="relative mt-[80px] h-[582px] overflow-hidden">
-      <video className="absolute inset-0 h-full w-full object-cover" src="/landing/hero.mp4" poster="/landing/hero.jpg" autoPlay muted loop playsInline />
+    <section className="relative mt-[80px] h-[582px] overflow-hidden" aria-label="Introducing Fashion Studio">
+      {still ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src="/landing/hero.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <video className="absolute inset-0 h-full w-full object-cover" src="/landing/hero.mp4" poster="/landing/hero.jpg" autoPlay muted loop playsInline aria-hidden />
+      )}
       <div className="absolute inset-0 bg-black/45" />
       <div className="relative flex h-full flex-col items-center justify-center px-6 pb-6 text-center">
         <div className="animate-rise text-[13px] font-medium tracking-[0.25em] text-white/55 uppercase">Introducing</div>
@@ -423,7 +430,11 @@ function Footer() {
 export function Landing() {
   return (
     <div className="min-h-screen bg-black text-white">
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
       <Nav />
+      <main id="main" tabIndex={-1} className="outline-none">
       <Hero />
       <BuiltFor />
       <Workflow />
@@ -434,6 +445,7 @@ export function Landing() {
       <ToolList />
       <Faq />
       <Cta />
+      </main>
       <Footer />
     </div>
   );

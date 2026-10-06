@@ -136,10 +136,11 @@ export const useStudio = create<State>((set, get) => ({
   },
 
   init: async (projectId) => {
+    // Read URL intent before any await: a concurrent init (React dev double-effects) may clean the URL.
+    const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
     set({ loaded: false, runs: [], activeId: null, selection: null, toolId: null, mode: "select", selectedIds: [], segments: {} });
     const [me, proj, feed] = await Promise.all([api.me(), api.project(projectId), api.feed(projectId)]);
     const first = feed.runs.find((r) => r.outputs.length)?.outputs[0]?.id ?? null;
-    const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
     const tool = params?.get("tool");
     set({
       me,
@@ -149,7 +150,8 @@ export const useStudio = create<State>((set, get) => ({
       loaded: true,
       activeId: first,
       view: params?.get("view") === "feed" ? "feed" : "editor",
-      welcome: me.onboarded ? "hidden" : "intro",
+      // ?tour=1 replays onboarding on demand (Help → Take the tour links, tests).
+      welcome: params?.get("tour") === "1" || !me.onboarded ? "intro" : "hidden",
     });
     if (tool && toolById(tool)) get().openTool(tool);
   },

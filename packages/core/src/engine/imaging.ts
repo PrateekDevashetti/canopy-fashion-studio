@@ -124,6 +124,37 @@ export async function binarizeMask(mask: Buffer, size: Dims): Promise<Buffer> {
   return img.threshold(127).png().toBuffer();
 }
 
+/**
+ * Key out a chroma-green background into transparency, applied to the ORIGINAL pixels where
+ * possible (the green render only decides the alpha), with a soft edge and despill.
+ */
+export async function chromaKey(green: Buffer, original: Buffer): Promise<Buffer> {
+  const od = await dims(original);
+  const gd = await dims(green);
+  // If the model reframed the image, the original's pixels no longer line up — key the model's own.
+  const aligned = Math.abs(Math.log(gd.width / gd.height / (od.width / od.height))) < 0.02;
+  const size = aligned ? od : gd;
+  const g = await sharp(green).resize(size.width, size.height, { fit: "fill" }).removeAlpha().raw().toBuffer();
+  const o = aligned ? await sharp(original).rotate().resize(size.width, size.height).removeAlpha().raw().toBuffer() : g;
+  const alpha = Buffer.alloc(size.width * size.height);
+  for (let i = 0, j = 0; i < alpha.length; i++, j += 3) {
+    const r = g[j], gg = g[j + 1], b = g[j + 2];
+    // How "green-screen" is this pixel? 0 = subject, 1 = background.
+    const dom = gg - Math.max(r, b);
+    const t = Math.min(1, Math.max(0, (dom - 40) / 80));
+    alpha[i] = Math.round((1 - t) * 255);
+  }
+  const softened = await sharp(alpha, { raw: { width: size.width, height: size.height, channels: 1 } }).blur(0.8).raw().toBuffer();
+  const rgba = Buffer.alloc(size.width * size.height * 4);
+  for (let i = 0, j = 0; i < softened.length; i++, j += 3) {
+    rgba[i * 4] = o[j];
+    rgba[i * 4 + 1] = Math.min(o[j + 1], Math.max(o[j], o[j + 2]) + 30); // despill
+    rgba[i * 4 + 2] = o[j + 2];
+    rgba[i * 4 + 3] = softened[i];
+  }
+  return sharp(rgba, { raw: { width: size.width, height: size.height, channels: 4 } }).png().toBuffer();
+}
+
 export async function toPng(buf: Buffer): Promise<Buffer> {
   return sharp(buf).png().toBuffer();
 }

@@ -128,6 +128,48 @@ export async function download(url: string): Promise<{ buf: Buffer; mime: string
   });
 }
 
+/* ---------- circuit breaker: skip a provider that's out of balance / down for a while ---------- */
+
+const tripped = new Map<string, number>();
+export const providerDown = (name: string) => (tripped.get(name) ?? 0) > Date.now();
+export function tripIfFatal(name: string, e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (/locked|exhausted balance|top.?up|insufficient (credits|funds)|payment required|401|unauthorized/i.test(msg) || (e instanceof ProviderError && (e.status === 401 || e.status === 402 || e.status === 403))) {
+    tripped.set(name, Date.now() + 5 * 60_000);
+    console.warn(`[providers] ${name} disabled for 5 min: ${msg.slice(0, 120)}`);
+  }
+}
+
+/** Gemini image generation/editing through OpenRouter (Nano Banana 2). Returns PNG/JPEG buffers. */
+export async function openrouterImage(prompt: string, images: string[], opts: { aspect?: string; size?: string; model?: string } = {}): Promise<Buffer[]> {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) throw new ProviderError("OPENROUTER_API_KEY is not configured", 500);
+  const model = opts.model ?? process.env.FASHION_OR_IMAGE_MODEL ?? "google/gemini-3.1-flash-image";
+  const image_config: Record<string, string> = {};
+  if (opts.aspect && opts.aspect !== "auto") image_config.aspect_ratio = opts.aspect;
+  if (opts.size) image_config.image_size = opts.size;
+  return withRetry(async () => {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "content-type": "application/json", "X-Title": "Canopy Fashion Studio" },
+      body: JSON.stringify({
+        model,
+        modalities: ["image", "text"],
+        ...(Object.keys(image_config).length ? { image_config } : {}),
+        messages: [{ role: "user", content: [...images.map((url) => ({ type: "image_url", image_url: { url } })), { type: "text", text: prompt }] }],
+      }),
+      signal: AbortSignal.timeout(180_000),
+    }).catch((e) => {
+      throw new ProviderError(`${model}: ${(e as Error).message}`, 0, true);
+    });
+    if (!res.ok) throw new ProviderError(`${model}: ${await readError(res)}`, res.status, res.status === 429 || res.status >= 500);
+    const j = (await res.json()) as { choices?: { message?: { images?: { image_url?: { url?: string } }[]; content?: string } }[] };
+    const urls = (j.choices?.[0]?.message?.images ?? []).map((i) => i.image_url?.url).filter((u): u is string => !!u);
+    if (!urls.length) throw new ProviderError(`${model}: no image returned${j.choices?.[0]?.message?.content ? ` (${String(j.choices[0].message.content).slice(0, 120)})` : ""}`, 502, true);
+    return Promise.all(urls.map(async (u) => (await download(u)).buf));
+  }, 2);
+}
+
 /** OpenRouter chat call that must return JSON. */
 export async function visionJson<T>(model: string, prompt: string, images: string[]): Promise<T> {
   const key = process.env.OPENROUTER_API_KEY;
