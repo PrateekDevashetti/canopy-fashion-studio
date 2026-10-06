@@ -66,8 +66,10 @@ real-model scripts in `qa/`.
 ## M9 Ship
 - [x] Push to GitHub
 - [x] Production `next build` passes
-- [!] Neon project — accept Neon Marketplace terms in the browser, then `bash scripts/ship.sh`
-- [~] Vercel project created; env + deploy run by `scripts/ship.sh`
-- [~] Railway worker project created; env + deploy run by `scripts/ship.sh`
+- [x] Neon project `canopy-fashion-studio` (noisy-water-24376320, created with neonctl) + baseline schema
+- [x] Vercel env (15 vars) + preview → verified → promoted: https://canopy-fashion-studio.vercel.app
+- [x] Railway `fashion-worker` env + deploy, worker up (concurrency 6)
 - [!] fal account locked (`TOP_UP`) — image tools fall back to OpenRouter; video tools need fal
-- [ ] Prod smoke test; domain `fashion.trycanopy.space` (DNS by user)
+- [x] Prod smoke: health ok, landing e2e 5/5, `qa/prod-smoke.sh` (guest tour → Neon/R2 → files, guest gate, cross-origin 403)
+- [ ] Custom domain `fashion.trycanopy.space` (DNS at GoDaddy by user)
+- [ ] Signed-in real-model run on prod (needs a Clerk test user / fal top-up for video)
