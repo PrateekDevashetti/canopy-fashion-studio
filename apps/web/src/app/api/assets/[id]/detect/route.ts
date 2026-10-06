@@ -20,4 +20,4 @@ export const POST = route<Ctx>(async (req, user, { params }) => {
     console.error("[detect]", e);
     throw new HttpError(502, "Couldn't detect garments on this image. Try again, or select by hand.");
   }
-}, { guests: true });
+}, { guests: true, limit: "detect" });

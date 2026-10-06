@@ -145,6 +145,13 @@ export const creditLedger = pgTable(
   (t) => [index("ledger_user_idx").on(t.userId, t.createdAt)],
 );
 
+/** Fixed-window rate limits shared by every web instance (one row per key). */
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  count: integer("count").notNull().default(0),
+});
+
 export type UserRow = typeof users.$inferSelect;
 export type ProjectRow = typeof projects.$inferSelect;
 export type RunRow = typeof runs.$inferSelect;

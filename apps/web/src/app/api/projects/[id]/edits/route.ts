@@ -32,4 +32,4 @@ export const POST = route<Ctx>(async (req, user, { params }) => {
   if (overlay.size > 4 * 1024 * 1024) throw new HttpError(413, "Annotation layer too large");
   const asset = await saveEdit(user.id, id, parentId, { op: "annotate", overlay: Buffer.from(await overlay.arrayBuffer()) });
   return json({ asset: serializeAsset(asset) }, 201);
-});
+}, { limit: "edits" });

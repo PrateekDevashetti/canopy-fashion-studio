@@ -38,4 +38,4 @@ export const POST = route<Ctx>(async (req, user, { params }) => {
   const runId = typeof form.get("runId") === "string" ? (form.get("runId") as string) : null;
   const asset = await uploadImage(user.id, id, { buf: Buffer.from(await file.arrayBuffer()), name: file.name || "Upload", type: file.type }, runId);
   return json({ asset: serializeAsset(asset) }, 201);
-});
+}, { limit: "uploads" });

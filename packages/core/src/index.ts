@@ -3,6 +3,7 @@ export * from "./service";
 export * from "./storage";
 export * from "./ids";
 export * from "./tour";
+export * from "./ratelimit";
 export * from "./tools/registry";
 export { db, closeDb } from "./db/client";
 export * as schema from "./db/schema";

@@ -1,4 +1,5 @@
-import { addReview, assetByShareToken, HttpError, reviewThread } from "@fashion/core";
+import { addReview, assetByShareToken, clientIp, HttpError, rateLimit, reviewThread } from "@fashion/core";
+import { sameOrigin } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ token: string }> };
@@ -14,6 +15,8 @@ export async function GET(_req: Request, { params }: Ctx) {
 
 export async function POST(req: Request, { params }: Ctx) {
   try {
+    if (!sameOrigin(req)) throw new HttpError(403, "Cross-origin request blocked");
+    if (!(await rateLimit("review", clientIp(req))).ok) throw new HttpError(429, "Too many comments — try again in a minute.");
     const a = await assetByShareToken((await params).token);
     if (!a) throw new HttpError(404, "Not found");
     const b = (await req.json().catch(() => ({}))) as { author?: string; body?: string; verdict?: string };

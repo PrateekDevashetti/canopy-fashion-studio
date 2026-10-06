@@ -12,4 +12,4 @@ export const POST = route<Ctx>(async (req, user, { params }) => {
   if (!(file instanceof File)) throw new HttpError(400, "Expected a mask image");
   const key = await saveMask(user.id, id, Buffer.from(await file.arrayBuffer()));
   return json({ key }, 201);
-});
+}, { limit: "edits" });

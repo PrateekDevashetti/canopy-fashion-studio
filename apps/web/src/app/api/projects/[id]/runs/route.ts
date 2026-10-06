@@ -13,4 +13,4 @@ export const POST = route<Ctx>(async (req, user, { params }) => {
   const run = await createRun(user.id, id, String(b.tool ?? ""), b.inputs ?? {}, b.settings ?? {});
   dispatch(run.id);
   return json({ run }, 201);
-});
+}, { limit: "runs" });

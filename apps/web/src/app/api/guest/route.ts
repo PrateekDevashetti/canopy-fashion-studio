@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createProject, ensureUser, listProjects } from "@fashion/core";
+import { clientIp, createProject, ensureUser, listProjects, rateLimit } from "@fashion/core";
 import { customAlphabet } from "nanoid";
 import { getAccountUser, getSessionUser, GUEST_COOKIE, signGuest } from "@/lib/auth";
 
@@ -17,6 +17,7 @@ export async function GET(req: Request) {
     const id = p?.id ?? (await createProject(existing.id, "Fashion Studio tour")).id;
     return NextResponse.redirect(new URL(`/studio/${id}`, origin));
   }
+  if (!(await rateLimit("guest", clientIp(req))).ok) return NextResponse.json({ error: "Too many demo workspaces from this network — sign up to keep going." }, { status: 429 });
   const id = `guest_${gid()}`;
   await ensureUser(id, { name: "Guest" });
   const project = await createProject(id, "Fashion Studio tour");
