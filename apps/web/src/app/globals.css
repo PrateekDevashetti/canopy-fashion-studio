@@ -1,0 +1,167 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Fashion Studio tokens — sampled from the reference studio UI, typeset in Canopy's
+ * DM Sans / DM Mono pairing (Playfair Display italic for display moments).
+ */
+@theme {
+  --color-bg: #000000;
+  --color-stage: #050505;
+  --color-panel: #141414;
+  --color-panel-2: #1a1a1a;
+  --color-field: #1c1c1c;
+  --color-raise: #242424;
+  --color-hover: #262626;
+  --color-line: #232323;
+  --color-line-2: #2e2e2e;
+  --color-line-3: #3a3a3a;
+  --color-fg: #f2f2f2;
+  --color-fg-2: #d6d6d6;
+  --color-dim: #a1a1a1;
+  --color-mute: #858585;
+  --color-faint: #5c5c5c;
+  --color-accent: #5bc466;
+  --color-accent-hi: #6fd679;
+  --color-accent-ink: #0d1a0f;
+  --color-accent-deep: #2c6c35;
+  --color-accent-bg: #1b3320;
+  --color-accent-bg-2: #213d27;
+  --color-accent-fg: #7ee08a;
+  --color-danger: #ef5350;
+  --color-danger-bg: #1c0f10;
+  --color-danger-line: #6a2a2c;
+  --color-mag: #e04fe0;
+
+  --font-sans: var(--font-dm-sans), "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-dm-mono), "DM Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-serif: var(--font-playfair), "Playfair Display", Georgia, serif;
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-fade-in: fade-in 0.18s ease-out both;
+  --animate-pop: pop 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  --animate-rise: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+
+  @keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: translateY(4px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(91, 196, 102, 0.35);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+button,
+[role="button"] {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+
+/* ---------- studio primitives ---------- */
+@layer components {
+  .panel {
+    @apply rounded-[14px] border border-line bg-panel;
+  }
+  .glass {
+    @apply border border-line-2 bg-[#161616]/95 shadow-[0_8px_30px_rgba(0,0,0,0.5)] backdrop-blur-md;
+  }
+  .kbd {
+    @apply inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[5px] bg-[#2a2a2a] px-1 font-sans text-[10.5px] font-medium text-dim;
+  }
+  .icon-btn {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-[10px] text-fg-2 transition-colors hover:bg-hover hover:text-fg disabled:opacity-35 disabled:hover:bg-transparent;
+  }
+  .icon-btn-on {
+    @apply bg-accent-bg text-accent-fg hover:bg-accent-bg-2 hover:text-accent-fg;
+  }
+  .btn {
+    @apply inline-flex h-8 items-center justify-center gap-1.5 rounded-[9px] bg-raise px-3 text-[12.5px] font-medium text-fg transition-colors hover:bg-[#2e2e2e] disabled:opacity-40;
+  }
+  .btn-accent {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-accent-ink transition-colors hover:bg-accent-hi disabled:bg-accent-deep disabled:text-[#cfe6d2]/80;
+  }
+  .btn-white {
+    @apply inline-flex h-8 items-center justify-center gap-1.5 rounded-[9px] bg-white px-3.5 text-[12.5px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-40;
+  }
+  .field {
+    @apply rounded-[10px] border border-line-2 bg-field text-[13px] text-fg placeholder:text-mute outline-none transition-colors focus:border-line-3;
+  }
+  .menu {
+    @apply z-50 min-w-[180px] overflow-hidden rounded-[12px] border border-line-2 bg-[#1b1b1b] p-1 shadow-[0_12px_40px_rgba(0,0,0,0.6)] animate-pop;
+  }
+  .menu-item {
+    @apply flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left text-[13px] text-fg-2 transition-colors hover:bg-hover hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent;
+  }
+  .label {
+    @apply flex items-center gap-1 text-[12px] font-medium text-fg-2;
+  }
+  .shimmer {
+    background: linear-gradient(90deg, #1a1a1a 0%, #262626 50%, #1a1a1a 100%);
+    background-size: 800px 100%;
+    @apply animate-shimmer;
+  }
+  .checker {
+    background-color: #2a2a2a;
+    background-image: radial-gradient(#3a3a3a 1px, transparent 1px);
+    background-size: 14px 14px;
+  }
+  .dots {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.22) 1.2px, transparent 1.4px);
+    background-size: 22px 22px;
+  }
+}
+
+/* range inputs used by sliders */
+input[type="range"].range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  width: 100%;
+  height: 100%;
+}
+input[type="range"].range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 2px;
+  height: 18px;
+  background: #e5e5e5;
+  border-radius: 1px;
+}
+input[type="range"].range::-moz-range-thumb {
+  width: 2px;
+  height: 18px;
+  background: #e5e5e5;
+  border: 0;
+}

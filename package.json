@@ -1,0 +1,23 @@
+{
+  "name": "canopy-fashion-studio",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Fashion Studio by Canopy Labs — sketch to render, recolor, swap and shoot garments in one workspace.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @fashion/web",
+    "dev:worker": "npm run dev -w @fashion/worker",
+    "build": "npm run build -w @fashion/web",
+    "start": "npm run start -w @fashion/worker",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w @fashion/core",
+    "db:push": "npm run db:push -w @fashion/core",
+    "verify": "npm run typecheck && npm test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
