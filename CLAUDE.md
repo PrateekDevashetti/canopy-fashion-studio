@@ -13,6 +13,11 @@ shoot → review). Spec: `docs/PRD.md`. Work queue: `docs/TASKS.md` — **tick t
 
 ## Commands
 - `npm run dev` (web, inline engine) · `npm run dev:worker` · `npm run verify` (typecheck + unit tests)
+- E2E: start `npm run dev:e2e -w @fashion/web` (blanks Clerk keys → single-user dev auth; plain `dev` makes every
+  signed-in test 401), then `npx e2e run` (bare `npx e2e` only prints help). `E2E_REAL_MODELS=1` adds paid model tests.
+- Architecture + run-flow diagrams (archify, source-cited): `.archify/*/` — HTML is self-contained; regenerate with
+  `node ~/.claude/skills/archify/bin/archify.mjs finalize <type> <candidate.json> <out.html> --repo-root . --quality showcase`
+  (`ARCHIFY_CHROME` = Playwright's Chrome for Testing for the browser gate).
 - DB: local `postgres://localhost:5432/fashion_studio`; `cd packages/core && npx drizzle-kit push --force`
 - Env lives in `.env.local` at repo root (copied from floraxfauna; never print values). Web reads it via `apps/web/.env.local` symlink.
 
@@ -23,7 +28,8 @@ shoot → review). Spec: `docs/PRD.md`. Work queue: `docs/TASKS.md` — **tick t
 - Vision: OpenRouter `google/gemini-3.6-flash` (returns garment labels + box_2d 0–1000).
 - The Gemini direct key is **free tier: image quota 0** — don't use it for generation.
 - 2026-10-06: fal account **locked (TOP_UP)** — image tools fall back to OpenRouter (Gemini 3 Pro / 3.1 Flash Image);
-  video (Veo/Kling) and FASHN try-on need fal topped up.
+  video falls back to OpenRouter (Veo 3.1 Fast → Kling v3.0 Pro → Seedance 2.5); FASHN try-on needs fal.
+- OpenRouter refuses image/video output below $1.00 balance — `node qa/or-balance.mjs` checks it (2026-10-07: $0.52).
 
 ## Assets (don't regress these)
 - **Masters are exact**: uploads stored byte-for-byte (`media.ts` `storeImage`, sha256 in `assets.meta`); results stored
@@ -50,6 +56,11 @@ shoot → review). Spec: `docs/PRD.md`. Work queue: `docs/TASKS.md` — **tick t
 ## Ops
 - Schema changes: edit `schema.ts` **and** add an idempotent SQL file in `packages/core/migrations/`.
 - Rate limits (`ratelimit.ts`) via `route(handler, { limit })`; security events are JSON log lines `level: "security"`.
+- Prod migrations applied: 0000 baseline, 0003 boards/explore/folders (2026-10-07). Prod DB changes need the user's go-ahead.
+- Security headers: site CSP in `next.config.ts` excludes `/api/files/*` (that route sets its own; SVG gets `sandbox`).
+  A config header would overwrite a route header — keep the exclusion.
+- Analytics: PostHog `NEXT_PUBLIC_POSTHOG_KEY` (public `phc_` key → Vercel `--type config`) + `_HOST`; server events in
+  `packages/core/src/analytics.ts`, client in `apps/web/src/lib/analytics.ts`.
 - SLOs, alerts, runbooks: `docs/SLO.md`. CTO review + roadmap: `docs/CTO-REVIEW.md`.
 - Core tests run with `tsx --test` (extensionless imports).
 

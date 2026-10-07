@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Canopy Fashion Studio — Production Architecture",
+    "output": ".archify/architecture-fashion-studio-20261007-093629/fashion-studio-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "git@github.com:PrateekDevashetti/canopy-fashion-studio.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "656933a864dede2b71564b779eb516ad691f3751"
+    }
+  },
+  "components": [
+    { "id": "browser", "type": "frontend", "label": "Studio in browser", "sublabel": "Next.js client app", "pos": [40, 230], "size": [150, 64],
+      "sources": [{ "path": "apps/web/src/lib/analytics.ts", "line": 53, "label": "client events" }] },
+    { "id": "proxy", "type": "security", "label": "Route proxy", "sublabel": "src/proxy.ts", "pos": [280, 230], "size": [150, 64],
+      "sources": [{ "path": "apps/web/src/proxy.ts", "line": 7, "end_line": 17, "label": "Clerk-protected app routes" }] },
+    { "id": "clerk", "type": "external", "label": "Clerk", "sublabel": "shared dev instance", "pos": [280, 70], "size": [150, 64],
+      "sources": [{ "path": "apps/web/src/lib/auth.ts", "line": 6, "end_line": 8, "label": "clerk vs dev auth" }] },
+    { "id": "api", "type": "backend", "label": "REST API", "sublabel": "route() + rate limits", "pos": [530, 230], "size": [150, 64],
+      "sources": [
+        { "path": "apps/web/src/lib/http.ts", "line": 32, "label": "route wrapper" },
+        { "path": "packages/core/src/ratelimit.ts", "line": 28, "label": "Postgres rate limit" }
+      ] },
+    { "id": "service", "type": "backend", "label": "Run service", "sublabel": "validate + debit", "pos": [780, 230], "size": [150, 64],
+      "sources": [{ "path": "packages/core/src/service.ts", "line": 98, "end_line": 121, "label": "createRun" }] },
+    { "id": "neon", "type": "database", "label": "Neon Postgres", "sublabel": "runs · assets · credits", "pos": [1030, 230], "size": [150, 64],
+      "sources": [{ "path": "packages/core/src/data.ts", "line": 80, "label": "atomic debit" }] },
+    { "id": "r2", "type": "database", "label": "Cloudflare R2", "sublabel": "exact masters + previews", "pos": [530, 420], "size": [150, 64],
+      "sources": [
+        { "path": "packages/core/src/storage.ts", "line": 75, "label": "putObject" },
+        { "path": "packages/core/src/storage.ts", "line": 121, "label": "presignGet" },
+        { "path": "packages/core/src/media.ts", "line": 94, "label": "storeImage byte-exact" }
+      ] },
+    { "id": "engine", "type": "backend", "label": "Generation engine", "sublabel": "tools + consistency", "pos": [780, 420], "size": [150, 64],
+      "sources": [
+        { "path": "packages/core/src/engine/run.ts", "line": 588, "label": "executeRun" },
+        { "path": "packages/core/src/engine/run.ts", "line": 98, "label": "generateImages chain" }
+      ] },
+    { "id": "worker", "type": "backend", "label": "Worker", "sublabel": "claim loop + /health", "pos": [1030, 420], "size": [150, 64],
+      "sources": [{ "path": "apps/worker/src/main.ts", "line": 18, "end_line": 53, "label": "claim, recover, purge" }] },
+    { "id": "posthog", "type": "external", "label": "PostHog", "sublabel": "run + UI events", "pos": [1270, 420], "size": [150, 64],
+      "sources": [{ "path": "packages/core/src/engine/run.ts", "line": 617, "label": "run_succeeded / failed" }] },
+    { "id": "fal", "type": "cloud", "label": "fal.ai", "sublabel": "Nano Banana · SAM 3 · Veo", "pos": [680, 600], "size": [150, 64],
+      "sources": [{ "path": "packages/core/src/engine/providers.ts", "line": 53, "label": "falRun" }] },
+    { "id": "openrouter", "type": "cloud", "label": "OpenRouter", "sublabel": "image, video, vision", "pos": [880, 600], "size": [150, 64],
+      "sources": [
+        { "path": "packages/core/src/engine/providers.ts", "line": 216, "label": "openrouterImage" },
+        { "path": "packages/core/src/engine/providers.ts", "line": 136, "label": "video submit" }
+      ] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Vercel · canopy-fashion-studio", "wraps": ["proxy", "api", "service"], "pad": 20 },
+    { "kind": "region", "label": "Railway · fashion-worker", "wraps": ["engine", "worker"], "pad": 20 }
+  ],
+  "connections": [
+    { "from": "browser", "to": "proxy", "label": "HTTPS", "variant": "emphasis" },
+    { "from": "proxy", "to": "clerk", "label": "auth.protect()", "variant": "security" },
+    { "from": "proxy", "to": "api", "label": "/api/*", "variant": "emphasis" },
+    { "from": "api", "to": "service", "label": "createRun", "variant": "emphasis" },
+    { "from": "service", "to": "neon", "label": "queue run", "variant": "emphasis" },
+    { "from": "worker", "to": "neon", "label": "claim SKIP LOCKED", "variant": "emphasis" },
+    { "from": "worker", "to": "engine", "label": "executeRun", "variant": "emphasis" },
+    { "from": "engine", "to": "r2", "label": "store outputs" },
+    { "from": "api", "to": "r2", "label": "presigned GET", "variant": "dashed" },
+    { "from": "engine", "to": "fal", "label": "primary" },
+    { "from": "engine", "to": "openrouter", "label": "fallback", "variant": "dashed" },
+    { "from": "worker", "to": "posthog", "label": "run events", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Credits are never lost", "items": [
+      "createRun debits atomically before queueing",
+      "Any failed model path retries, falls back, then refunds",
+      "Free accounts start with 20 credits"
+    ] },
+    { "dot": "cyan", "title": "Assets stay exact", "items": [
+      "Uploads and results stored byte-for-byte with sha256",
+      "Feed shows WebP previews; downloads use the master",
+      "Files over 4 MB upload in chunks and download via presigned R2"
+    ] },
+    { "dot": "amber", "title": "Engine modes", "items": [
+      "Production: Railway worker claims queued runs",
+      "Local dev: the API runs the engine inline after the response",
+      "Claims are atomic, so inline and worker can race safely"
+    ] }
+  ]
+}

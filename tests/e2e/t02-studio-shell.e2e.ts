@@ -1,5 +1,6 @@
 // Studio shell: rail sections/tools, hover previews, tool panel, view toggles, empty state, project rename.
 import { test } from "@e2e-dev/web";
+import { TOOLS } from "../../packages/core/src/tools/registry";
 import { expect, newProject, openStudio, setOnboarded, uploadPublic } from "./helpers";
 
 test("empty project shows the start screen and every tool", async ({ browser, screen }) => {
@@ -9,7 +10,7 @@ test("empty project shows the start screen and every tool", async ({ browser, sc
   await expect(screen.getByText("Start with a sketch, reference, or prompt of your idea.")).toBeVisible();
   for (const s of ["Concept", "Refine", "Showcase"]) await expect(screen.getByText(s, { exact: true }).first()).toBeVisible();
   const tools = await browser.evaluate(() => [...document.querySelectorAll("[data-tool]")].map((e) => e.getAttribute("data-tool")));
-  expect(tools.length).toBe(15);
+  expect(tools.length).toBe(TOOLS.length);
 });
 
 test("hovering a tool shows its preview card; clicking opens its panel", async ({ browser, screen }) => {

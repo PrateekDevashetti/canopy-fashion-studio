@@ -8,3 +8,6 @@ qa/out
 *.tsbuildinfo
 .vercel
 .DS_Store
+
+# e2e run artifacts (traces, reports)
+.e2e/

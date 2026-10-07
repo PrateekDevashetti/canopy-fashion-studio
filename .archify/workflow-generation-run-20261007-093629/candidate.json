@@ -1,0 +1,68 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Fashion Studio — Generate Run Flow",
+    "output": ".archify/workflow-generation-run-20261007-093629/generation-run-flow.html",
+    "quality_profile": "showcase",
+    "viewBox": [1040, 652],
+    "repository": {
+      "url": "git@github.com:PrateekDevashetti/canopy-fashion-studio.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "656933a864dede2b71564b779eb516ad691f3751"
+    }
+  },
+  "lanes": [
+    { "id": "studio", "label": "Studio UI" },
+    { "id": "api", "label": "API on Vercel" },
+    { "id": "worker", "label": "Worker on Railway" },
+    { "id": "recovery", "label": "Failure + refund", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "compose", "label": "Compose", "fromCol": 0, "toCol": 1 },
+    { "id": "admit", "label": "Admit + charge", "fromCol": 2, "toCol": 2, "variant": "security" },
+    { "id": "generate", "label": "Generate", "fromCol": 3, "toCol": 4, "variant": "emphasis" },
+    { "id": "review", "label": "Review", "fromCol": 5, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["pick", "generate", "create", "claim", "execute", "feed"],
+  "nodes": [
+    { "id": "pick", "lane": "studio", "col": 0, "type": "frontend", "label": "Pick tool + inputs", "sublabel": "images, mask, colors", "width": 140 },
+    { "id": "generate", "lane": "studio", "col": 1, "type": "frontend", "label": "Generate", "sublabel": "shows credit cost", "width": 140 },
+    { "id": "feed", "lane": "studio", "col": 5, "type": "frontend", "label": "Result in feed", "sublabel": "poll until done", "width": 140 },
+    { "id": "create", "lane": "api", "col": 2, "type": "security", "label": "createRun", "sublabel": "validate + debit", "width": 140,
+      "sources": [{ "path": "packages/core/src/service.ts", "line": 98, "end_line": 121 }] },
+    { "id": "reject", "lane": "recovery", "col": 2, "type": "security", "label": "Rejected", "sublabel": "402 / 400, no charge", "width": 140,
+      "sources": [{ "path": "packages/core/src/service.ts", "line": 115 }] },
+    { "id": "claim", "lane": "worker", "col": 3, "type": "messagebus", "label": "Claim run", "sublabel": "SKIP LOCKED", "width": 140,
+      "sources": [{ "path": "packages/core/src/engine/run.ts", "line": 568 }] },
+    { "id": "execute", "lane": "worker", "col": 4, "type": "backend", "label": "Execute tool", "sublabel": "fal → OpenRouter", "width": 140,
+      "sources": [{ "path": "packages/core/src/engine/run.ts", "line": 588 }, { "path": "packages/core/src/engine/run.ts", "line": 98 }] },
+    { "id": "refund", "lane": "recovery", "col": 4, "type": "security", "label": "Refund credits", "sublabel": "friendly error", "width": 140,
+      "sources": [{ "path": "packages/core/src/engine/run.ts", "line": 581, "end_line": 583 }] },
+    { "id": "recover", "lane": "recovery", "col": 3, "type": "messagebus", "label": "Recover stale", "sublabel": "re-queue after 20 min", "width": 140,
+      "sources": [{ "path": "packages/core/src/engine/run.ts", "line": 640 }] }
+  ],
+  "edges": [
+    { "id": "pick-generate", "from": "pick", "to": "generate", "variant": "default" },
+    { "id": "generate-create", "from": "generate", "to": "create", "label": "POST runs", "variant": "emphasis" },
+    { "id": "create-claim", "from": "create", "to": "claim", "label": "queued", "variant": "emphasis" },
+    { "id": "create-reject", "from": "create", "to": "reject", "label": "invalid / no credits", "variant": "security", "role": "error" },
+    { "id": "claim-execute", "from": "claim", "to": "execute", "variant": "emphasis" },
+    { "id": "execute-feed", "from": "execute", "to": "feed", "label": "outputs saved", "variant": "emphasis" },
+    { "id": "execute-refund", "from": "execute", "to": "refund", "label": "all models failed", "variant": "security", "role": "error" },
+    { "id": "recover-claim", "from": "recover", "to": "claim", "label": "worker died", "variant": "dashed", "role": "branch" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "What the user sees", "items": [
+      "Cost is shown before Generate",
+      "A placeholder appears in the feed immediately",
+      "Failures come back as a message plus a refund"
+    ] },
+    { "dot": "rose", "title": "Model fallback order", "items": [
+      "Images: fal Nano Banana, then OpenRouter Gemini",
+      "Video: fal Veo, then OpenRouter Veo 3.1, Kling, Seedance",
+      "Every path retries before falling back"
+    ] }
+  ]
+}

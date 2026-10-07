@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "6ffb689f-040e-4872-af1e-18b93fdf708e",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Users/prateekdevashetti/canopy-fashion-studio/.claude/worktrees/build/.archify/architecture-fashion-studio-20261007-093629/candidate.json",
+  "output": "/Users/prateekdevashetti/canopy-fashion-studio/.claude/worktrees/build/.archify/architecture-fashion-studio-20261007-093629/fashion-studio-architecture.html",
+  "specification": {
+    "sha256": "dce48a60aecf477514aadf2d672cf125d9d62ea70988943a7946bce1cf5cf29f",
+    "bytes": 6076
+  },
+  "artifact": {
+    "sha256": "29b6365e2092f7fe2e86b04b08a806f546a4af2ff1e44cc5cc402f38749e73a0",
+    "bytes": 771235
+  }
+}

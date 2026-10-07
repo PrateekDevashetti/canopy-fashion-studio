@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "696aa9a3-8e12-476b-a2a9-19d07d3cfe7a",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/Users/prateekdevashetti/canopy-fashion-studio/.claude/worktrees/build/.archify/workflow-generation-run-20261007-093629/candidate.json",
+  "output": "/Users/prateekdevashetti/canopy-fashion-studio/.claude/worktrees/build/.archify/workflow-generation-run-20261007-093629/generation-run-flow.html",
+  "specification": {
+    "sha256": "5c7dfd07775214c97831a292f0f604de9d8ca9686b0fd7b20744fb177a66b287",
+    "bytes": 4478
+  },
+  "artifact": {
+    "sha256": "91aacebb70ffd736e8aecb7eaeac8f9b5d302b5b0aafdf5e116f57ddb9b0cfa5",
+    "bytes": 760518
+  }
+}

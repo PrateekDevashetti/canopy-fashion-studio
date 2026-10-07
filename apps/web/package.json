@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3200",
+    "dev:e2e": "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY= CLERK_SECRET_KEY= next dev -p 3200",
     "build": "next build",
     "start": "next start -p ${PORT:-3200}",
     "typecheck": "tsc -p tsconfig.json --noEmit"

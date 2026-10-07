@@ -133,7 +133,7 @@ export function ToolRail() {
             </div>
           </section>
         ))}
-        <section>
+        {SOON.length > 0 && <section>
           <div className="mx-[7px] mt-[14px] mb-[10px] flex items-center gap-2">
             <span className="h-px flex-1 bg-line-2" />
             <span className="text-[11px] font-medium text-faint">Soon</span>
@@ -146,7 +146,7 @@ export function ToolRail() {
               </Tip>
             ))}
           </div>
-        </section>
+        </section>}
       </div>
     </aside>
   );

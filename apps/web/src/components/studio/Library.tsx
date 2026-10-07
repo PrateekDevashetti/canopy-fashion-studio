@@ -232,10 +232,10 @@ function ConnectorView({ id }: { id: keyof typeof CONNECTORS }) {
       <p className="mt-1 text-[13px] text-dim">{c.desc}</p>
       {!open ? (
         <button className="btn mt-5 h-10 px-4" onClick={() => setOpen(true)}>
-          <span className="flex items-center [&_svg]:h-4 [&_svg]:w-4">
+          <span aria-hidden className="flex items-center [&_svg]:h-4 [&_svg]:w-4">
             <c.Icon />
           </span>
-          Log in with {c.name}
+          <span>Log in with {c.name}</span>
         </button>
       ) : (
         <form
@@ -300,7 +300,7 @@ export function Library() {
           {nav.map((n) => (
             <button key={n.id} className={cn("flex h-[50px] items-center gap-3 rounded-[10px] px-3 text-[15px]", src === n.id ? "bg-[#262626] text-fg" : "text-fg-2 hover:bg-[#222] hover:text-fg")} onClick={() => setSrc(n.id)}>
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#242424] text-dim">{n.icon}</span>
-              {n.label}
+              <span>{n.label}</span>
               {n.badge && <span className="rounded-[6px] bg-accent-bg px-1.5 py-0.5 text-[12px] text-accent">{n.badge}</span>}
             </button>
           ))}
@@ -308,7 +308,7 @@ export function Library() {
           {connectors.map((n) => (
             <button key={n.id} className={cn("flex h-[50px] items-center gap-3 rounded-[10px] px-3 text-[15px]", src === n.id ? "bg-[#262626] text-fg" : "text-fg-2 hover:bg-[#222] hover:text-fg")} onClick={() => setSrc(n.id)}>
               <span className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-[#242424] text-fg-2">{n.icon}</span>
-              {n.label}
+              <span>{n.label}</span>
             </button>
           ))}
           <div className="mt-auto px-3 pb-2 text-[11.5px] leading-[1.45] text-mute">
