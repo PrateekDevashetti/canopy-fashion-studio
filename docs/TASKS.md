@@ -69,7 +69,20 @@ real-model scripts in `qa/`.
 - [x] Neon project `canopy-fashion-studio` (noisy-water-24376320, created with neonctl) + baseline schema
 - [x] Vercel env (15 vars) + preview → verified → promoted: https://canopy-fashion-studio.vercel.app
 - [x] Railway `fashion-worker` env + deploy, worker up (concurrency 6)
-- [!] fal account locked (`TOP_UP`) — image tools fall back to OpenRouter; video tools need fal
+- [!] fal account locked (`TOP_UP`) — image + video tools fall back to OpenRouter; FASHN try-on needs fal
 - [x] Prod smoke: health ok, landing e2e 5/5, `qa/prod-smoke.sh` (guest tour → Neon/R2 → files, guest gate, cross-origin 403)
-- [ ] Custom domain `fashion.trycanopy.space` (DNS at GoDaddy by user)
-- [ ] Signed-in real-model run on prod (needs a Clerk test user / fal top-up for video)
+- [ ] Signed-in real-model run on prod (needs a Clerk test user + OpenRouter ≥ $1)
+
+## M11 Round 2 (2026-10-07)
+- [x] All "Soon" tools live, Review Mode + Shopify panels, Library sources, project menu/folders/preferences, header credits,
+      7 s tour auto-advance, 20 free credits, PostHog events, OpenRouter video fallback, bg-removal stripe fix
+- [x] Migration 0003 applied locally and on prod Neon (11 tables)
+- [x] Full e2e 33/33 (fixed: empty Soon section, Library label a11y, SVG CSP overwritten by site header)
+- [x] Unit tests 18/18 + typecheck clean
+- [x] Archify diagrams (source-cited, all 4 gates pass): `.archify/architecture-fashion-studio-*/`, `.archify/workflow-generation-run-*/`
+- [x] PostHog env on Vercel (prod + preview) + Railway; Railway worker redeployed; Vercel preview verified → promoted
+- [x] Prod smoke re-run on the new release: all green
+- [x] Domain `fashion-studio.trycanopy.space` attached + verified on the Vercel project
+- [!] GoDaddy DNS: CNAME `fashion-studio` → `be2c16c77883f459.vercel-dns-016.com` (user), then set
+      `NEXT_PUBLIC_APP_URL` to the custom domain and redeploy
+- [!] OpenRouter balance $0.52 — image/video generation refused below $1 (user top-up)
