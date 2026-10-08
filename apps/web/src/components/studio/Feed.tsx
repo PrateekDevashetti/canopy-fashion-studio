@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { api, timeAgo, type AssetDTO, type ProjectDTO, type RunDTO } from "@/lib/api";
 import { useStudio, isPending, useAssets } from "@/lib/store";
+import { CANOPY_HOME } from "@/lib/canopy-home";
 import { ExportDialog, OpenInCanvasDialog, ShareAssetsDialog, ShareForReviewDialog } from "./FeedDialogs";
 import { copyShareLink, deleteAssets, deleteRun, downloadAsset, downloadAssets, openInCanvas, toggleFlag } from "@/lib/actions";
 import { cn, Popover, Spinner, Tip, useConfirm } from "@/components/ui";
@@ -58,7 +59,7 @@ function Breadcrumb() {
   };
   return (
     <div className="flex items-center gap-1.5 text-[13px]">
-      <a href="/studios" className="text-dim hover:text-fg">
+      <a href={CANOPY_HOME} className="text-dim hover:text-fg">
         Fashion Studio
       </a>
       <span className="text-faint">/</span>

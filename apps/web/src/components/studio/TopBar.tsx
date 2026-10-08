@@ -23,6 +23,7 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { CANOPY_HOME } from "@/lib/canopy-home";
 import { useStudio, type AnnotateMode, type SelectMode } from "@/lib/store";
 import { downloadAsset, removeBackground } from "@/lib/actions";
 import { cn, CanopyMark, Popover, Tip } from "@/components/ui";
@@ -163,7 +164,7 @@ function CreditsPill() {
             Get more credits →
           </a>
         </div>
-        <Link className="menu-item" href="/studios" onClick={() => setOpen(false)}>
+        <Link className="menu-item" href={CANOPY_HOME} onClick={() => setOpen(false)}>
           All projects
         </Link>
         <Link className="menu-item" href="/settings" onClick={() => setOpen(false)}>
@@ -222,7 +223,7 @@ export function TopBar() {
         ) : (
         <div className="pointer-events-auto flex flex-col">
           <div className="flex items-center gap-3">
-            <Link href="/studios" aria-label="All projects" className="flex h-6 w-6 items-center justify-center">
+            <Link href={CANOPY_HOME} aria-label="All projects" className="flex h-6 w-6 items-center justify-center">
               <CanopyMark size={19} />
             </Link>
             <ProjectMenu />
