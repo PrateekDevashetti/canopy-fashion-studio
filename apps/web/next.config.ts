@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
       {
         // /api/files sets its own, stricter CSP (sandboxed SVG); a config header here would overwrite it.
         source: "/((?!api/files/).*)",
-        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'self'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests" }],
+        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'self' https://app.trycanopy.space https://staging.trycanopy.space https://trycanopy.space https://floraxfauna-git-feat-brand-b-4f6ebf-prateekdevashettis-projects.vercel.app http://localhost:5197 http://localhost:5198; base-uri 'self'; object-src 'none'; upgrade-insecure-requests" }],
       },
     ];
   },

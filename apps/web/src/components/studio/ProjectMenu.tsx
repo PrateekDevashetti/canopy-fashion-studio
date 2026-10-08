@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronRight, Ellipsis, FolderInput, FolderPlus, House, Pencil, Plus, Shirt, SlidersHorizontal } from "lucide-react";
 import { api } from "@/lib/api";
-import { CANOPY_HOME } from "@/lib/canopy-home";
+import { goCanopyHome } from "@/lib/canopy-home";
 import { useStudio } from "@/lib/store";
 import { track } from "@/lib/analytics";
 import { cn, Modal, Popover, Spinner, useConfirm } from "@/components/ui";
@@ -87,7 +87,6 @@ function PreferencesDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const role = useStudio((s) => s.role);
   const set = useStudio((s) => s.set);
   const toast = useStudio((s) => s.toast);
-  const router = useRouter();
   const confirm = useConfirm();
   const p = project.preferences ?? {};
   const [desc, setDesc] = useState(p.description ?? "");
@@ -155,7 +154,7 @@ function PreferencesDialog({ open, onClose }: { open: boolean; onClose: () => vo
               onClick={async () => {
                 if (!(await confirm({ title: "Delete this project?", body: "Every run and result in it will be removed for everyone. This can't be undone.", confirm: "Delete project", danger: true }))) return;
                 await api.deleteProject(project.id);
-                window.location.assign(CANOPY_HOME);
+                goCanopyHome();
               }}
             >
               Delete project
@@ -220,7 +219,7 @@ export function ProjectMenu() {
         <Ellipsis size={15} />
       </button>
       <Popover open={open} onClose={() => setOpen(false)} anchor={ref} className="w-[300px] rounded-[16px] p-1.5">
-        <Item icon={<House size={15} />} label="Back to home" onClick={() => window.location.assign(CANOPY_HOME)} />
+        <Item icon={<House size={15} />} label="Back to home" onClick={() => goCanopyHome()} />
         <div className="mx-1 my-1 h-px bg-line-2" />
         <Item
           icon={<Plus size={15} />}

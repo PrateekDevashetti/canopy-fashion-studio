@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { identify, pageview } from "@/lib/analytics";
 import { useStudio, isPending } from "@/lib/store";
-import { CANOPY_HOME } from "@/lib/canopy-home";
+import { CANOPY_HOME, goCanopyHome } from "@/lib/canopy-home";
 import { ConfirmProvider, Spinner } from "@/components/ui";
 import { TopBar } from "./TopBar";
 import { ToolRail } from "./ToolRail";
@@ -107,7 +107,7 @@ export function Studio({ projectId }: { projectId: string }) {
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-bg text-center">
         <p className="text-[14px] text-fg">Couldn&apos;t open this project.</p>
         <p className="text-[12.5px] text-dim">{error}</p>
-        <a href={CANOPY_HOME} className="btn mt-2">
+        <a href={CANOPY_HOME} target="_top" onClick={goCanopyHome} className="btn mt-2">
           Back to Studios
         </a>
       </div>
@@ -165,7 +165,7 @@ export function Studio({ projectId }: { projectId: string }) {
         <div className="fixed inset-0 z-[99] flex flex-col items-center justify-center gap-3 bg-black/95 p-8 text-center min-[900px]:hidden">
           <p className="text-[16px] font-medium text-fg">Fashion Studio works best on a larger screen</p>
           <p className="max-w-[320px] text-[13.5px] leading-[1.5] text-dim">Open this project on a laptop or desktop to use the editor. Your work is saved and synced.</p>
-          <a href={CANOPY_HOME} className="btn mt-2 h-11 px-5">
+          <a href={CANOPY_HOME} target="_top" onClick={goCanopyHome} className="btn mt-2 h-11 px-5">
             Back to projects
           </a>
         </div>
