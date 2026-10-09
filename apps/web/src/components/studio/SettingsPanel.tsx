@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowUp, ChevronDown, Info, RectangleHorizontal, TriangleAlert, X } from "lucide-react";
 import { runCost, toolById, type InputSpec, type Tool } from "@fashion/core/tools";
+import { showCredits } from "@/lib/credits";
 import { useStudio, isPending } from "@/lib/store";
 import { blockedModelsFor, generate } from "@/lib/actions";
 import { cn, Popover, Spinner, Tip } from "@/components/ui";
@@ -159,6 +160,7 @@ export function SettingsPanel() {
   const setSetting = useStudio((s) => s.setToolSetting);
   const pending = useStudio((s) => s.runs.filter((r) => r.tool === toolId && isPending(r)).length);
   const credits = useStudio((s) => s.me?.credits ?? 0);
+  const unlimited = useStudio((s) => Boolean(s.me?.unlimitedCredits));
   const disabledModels = useStudio((s) => s.me?.disabledModels);
   const prefs = useStudio((s) => s.project?.preferences);
   const [busy, setBusy] = useState(false);
@@ -166,6 +168,8 @@ export function SettingsPanel() {
   if (!tool) return null;
   const { resolution, aspect } = toolSettings(tool, ts, prefs);
   const cost = runCost(tool, ts?.inputs ?? {}, resolution);
+  // An unlimited account is never short; everyone else needs the run's cost in hand.
+  const short = !unlimited && credits < cost;
   const isPrompt = tool.id === "prompt";
 
   return (
@@ -250,7 +254,7 @@ export function SettingsPanel() {
           <button
             data-tour="generate"
             className="btn-accent mt-[10px] w-full"
-            disabled={busy || blocked.length > 0 || credits < cost}
+            disabled={busy || blocked.length > 0 || short}
             onClick={async () => {
               setBusy(true);
               await generate(tool.id);
@@ -258,12 +262,12 @@ export function SettingsPanel() {
             }}
           >
             {busy ? <Spinner size={15} /> : "Generate"}
-            {!busy && <span className="text-[11.5px] font-normal opacity-60">· {cost} credits</span>}
+            {!busy && <span className="text-[11.5px] font-normal opacity-60">· {showCredits(cost)} credits</span>}
           </button>
         )}
-        {credits < cost && (
+        {short && (
           <p className="mt-2 text-center text-[11px] text-danger">
-            Not enough credits ({credits} left).{" "}
+            Not enough credits ({showCredits(credits)} left).{" "}
             <Link href="/settings" className="underline">
               Get more
             </Link>

@@ -1,7 +1,8 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "./db/client";
 import { assets, projects, runs } from "./db/schema";
-import { debitCredits, getUser, HttpError, insertAsset, refundCredits, requireProject, runWithOutputs } from "./data";
+import { getUser, HttpError, insertAsset, requireProject, runWithOutputs } from "./data";
+import { chargeRun, unchargeRun } from "./platform-credits";
 import { newId } from "./ids";
 import { binarizeMask, dims, maskCoverage } from "./engine/imaging";
 import { deleteObject, getObjectBuffer, putObject } from "./storage";
@@ -95,7 +96,12 @@ export async function blockedModels(ownerId: string, models: ModelId[]): Promise
   return models.filter((m) => disabled.has(m)).map((m) => MODELS[m]?.label ?? m);
 }
 
-export async function createRun(userId: string, projectId: string, toolId: string, rawInputs: Record<string, unknown>, rawSettings: { resolution?: unknown; aspect?: unknown } = {}) {
+/**
+ * `opts.platformToken` is the signed-in person's Clerk session token: with it the
+ * run is paid from their Canopy wallet (platform-credits.ts), else from the
+ * studio's own ledger.
+ */
+export async function createRun(userId: string, projectId: string, toolId: string, rawInputs: Record<string, unknown>, rawSettings: { resolution?: unknown; aspect?: unknown } = {}, opts: { platformToken?: string | null } = {}) {
   const { project } = await requireProject(projectId, userId, "edit");
   const tool = resolveTool(toolId);
   if (!tool) throw new HttpError(400, `Unknown tool "${toolId}"`);
@@ -112,13 +118,13 @@ export async function createRun(userId: string, projectId: string, toolId: strin
   const cost = runCost(tool as Tool, inputs, resolution);
 
   const id = newId("run");
-  if (!(await debitCredits(userId, cost, `${tool.name}`, id))) throw new HttpError(402, `Not enough credits — this run needs ${cost}.`);
+  const billing = await chargeRun({ userId, credits: cost, reason: `${tool.name}`, runId: id, platformToken: opts.platformToken });
   try {
     await db()
       .insert(runs)
-      .values({ id, projectId, userId, tool: tool.id, status: "queued", inputs, settings: { resolution, aspect }, cost, expected, model: tool.models.map((m) => MODELS[m]?.label ?? m).join(", ") });
+      .values({ id, projectId, userId, tool: tool.id, status: "queued", inputs, settings: { resolution, aspect }, cost, expected, model: tool.models.map((m) => MODELS[m]?.label ?? m).join(", "), ...(billing ? { providerRef: { billing } } : {}) });
   } catch (e) {
-    await refundCredits(userId, cost, "refund (create failed)", id);
+    await unchargeRun(billing, { userId, credits: cost, runId: id });
     throw e;
   }
   await db().update(projects).set({ updatedAt: new Date(), lastOpenedAt: new Date() }).where(eq(projects.id, projectId));

@@ -52,7 +52,8 @@ export type RunDTO = {
 export type ProjectPrefs = { description?: string; imageResolution?: string; videoResolution?: string; aspect?: string };
 export type ProjectDTO = { id: string; name: string; ownerId: string; studio: string; folderId?: string | null; preferences?: ProjectPrefs; createdAt: string; updatedAt: string; lastOpenedAt: string; cover?: string | null; shared?: boolean };
 export type Role = "owner" | "editor" | "viewer";
-export type Me = { id: string; email: string; name: string; imageUrl: string | null; credits: number; onboarded: boolean; disabledModels: string[]; guest?: boolean };
+/** `credits` is in tool credits (it compares with a tool's cost): the Canopy wallet when `platformWallet`, else the studio's ledger. */
+export type Me = { id: string; email: string; name: string; imageUrl: string | null; credits: number; platformWallet?: boolean; unlimitedCredits?: boolean; onboarded: boolean; disabledModels: string[]; guest?: boolean };
 export type SegmentDTO = { id: string; label: string; box: [number, number, number, number]; maskKey: string; maskUrl: string; area: number };
 
 export class ApiError extends Error {

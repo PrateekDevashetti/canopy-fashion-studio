@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Ellipsis, Plus, Search, Settings } from "lucide-react";
 import { api, timeAgo, type ProjectDTO } from "@/lib/api";
+import { showCredits } from "@/lib/credits";
 import { CanopyMark, ConfirmProvider, Modal, Popover, Spinner, useConfirm, cn } from "@/components/ui";
 import { UserMenu } from "./UserMenu";
 
@@ -84,7 +85,7 @@ function ProjectCard({ p, onRename, onDelete }: { p: ProjectDTO; onRename: (p: P
   );
 }
 
-function Inner({ user, initial }: { user: { name: string; email: string; credits: number }; initial: ProjectDTO[] }) {
+function Inner({ user, initial }: { user: { name: string; email: string; credits: number; unlimitedCredits?: boolean }; initial: ProjectDTO[] }) {
   const [tab, setTab] = useState<"studios" | "projects">("studios");
   const [projects, setProjects] = useState(initial);
   const [q, setQ] = useState("");
@@ -128,7 +129,7 @@ function Inner({ user, initial }: { user: { name: string; email: string; credits
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-3">
-          <span className="text-[12px] text-dim">{user.credits} credits</span>
+          <span className="text-[12px] text-dim">{showCredits(user.credits, user.unlimitedCredits)} credits</span>
           <Link href="/settings" aria-label="Settings" className="icon-btn">
             <Settings size={16} />
           </Link>
@@ -206,7 +207,7 @@ function Inner({ user, initial }: { user: { name: string; email: string; credits
   );
 }
 
-export function Dashboard(props: { user: { name: string; email: string; credits: number }; initial: ProjectDTO[] }) {
+export function Dashboard(props: { user: { name: string; email: string; credits: number; unlimitedCredits?: boolean }; initial: ProjectDTO[] }) {
   return (
     <ConfirmProvider>
       <Inner {...props} />

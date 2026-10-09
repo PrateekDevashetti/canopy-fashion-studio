@@ -4,13 +4,15 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { MODELS, TOOLS, type ModelId } from "@fashion/core/tools";
+import { showCredits } from "@/lib/credits";
+import { CANOPY_HOME, goCanopyHome } from "@/lib/canopy-home";
 import { api, timeAgo } from "@/lib/api";
 import { CanopyMark, cn, Spinner } from "@/components/ui";
 import { UserMenu } from "./UserMenu";
 
 type Row = { id: string; delta: number; reason: string; createdAt: string };
 
-export function SettingsView({ user, ledger }: { user: { name: string; email: string; credits: number; disabledModels: string[] }; ledger: Row[] }) {
+export function SettingsView({ user, ledger }: { user: { name: string; email: string; credits: number; platformWallet?: boolean; unlimitedCredits?: boolean; disabledModels: string[] }; ledger: Row[] }) {
   const [disabled, setDisabled] = useState<string[]>(user.disabledModels);
   const [saving, setSaving] = useState<string | null>(null);
   const toggle = async (m: string) => {
@@ -74,10 +76,11 @@ export function SettingsView({ user, ledger }: { user: { name: string; email: st
               <p className="text-[13px] text-dim">Every generation shows its cost before you run it. Failed generations are refunded automatically.</p>
             </div>
             <div className="text-right">
-              <div className="text-[26px] font-medium">{user.credits}</div>
+              <div className="text-[26px] font-medium">{showCredits(user.credits, user.unlimitedCredits)}</div>
               <div className="text-[11.5px] text-mute">credits left</div>
             </div>
           </div>
+          {user.platformWallet && <p className="mb-3 text-[12.5px] text-dim">Runs here spend your Canopy credits, the same balance as in Canopy. The list below is this studio&apos;s earlier credit history.</p>}
           <div className="overflow-hidden rounded-[12px] border border-line">
             {ledger.length === 0 && <p className="bg-panel px-4 py-6 text-center text-[13px] text-dim">No activity yet.</p>}
             {ledger.map((r, i) => (
@@ -85,14 +88,20 @@ export function SettingsView({ user, ledger }: { user: { name: string; email: st
                 <span className="flex-1 capitalize text-fg-2">{r.reason}</span>
                 <span className="text-[12px] text-mute">{timeAgo(r.createdAt)}</span>
                 <span className={cn("w-14 text-right font-mono", r.delta >= 0 ? "text-accent-fg" : "text-fg-2")}>
-                  {r.delta > 0 ? "+" : ""}
-                  {r.delta}
+                  {r.delta > 0 ? "+" : r.delta < 0 ? "−" : ""}
+                  {showCredits(Math.abs(r.delta))}
                 </span>
               </div>
             ))}
           </div>
           <p className="mt-3 text-[12px] text-mute">
-            Need more credits? <a className="underline hover:text-fg" href="mailto:hello@trycanopy.space?subject=Fashion%20Studio%20credits">Contact us</a>.
+            Need more credits?{" "}
+            {user.platformWallet ? (
+              <a className="underline hover:text-fg" href={CANOPY_HOME} target="_top" onClick={goCanopyHome}>Add them in Canopy</a>
+            ) : (
+              <a className="underline hover:text-fg" href="mailto:hello@trycanopy.space?subject=Fashion%20Studio%20credits">Contact us</a>
+            )}
+            .
           </p>
         </section>
       </main>

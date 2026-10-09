@@ -8,6 +8,7 @@ export * from "./collab";
 export * from "./shopify";
 export * from "./library";
 export * from "./tools/registry";
+export { chargeRun, platformBalance, settlePendingHolds, settleRun, unchargeRun, type RunBilling } from "./platform-credits";
 export { db, closeDb } from "./db/client";
 export * as schema from "./db/schema";
 export type { Segment, AssetRow, RunRow, ProjectRow, UserRow } from "./db/schema";

@@ -726,6 +726,17 @@ export function runCost(tool: Tool, inputs: Record<string, unknown>, resolution?
   return tool.cost * tool.outputs * batchSize(tool, inputs) * res;
 }
 
+/**
+ * What one tool credit costs on Canopy's platform wallet, in cents: the one
+ * place the costs above become money. Three cents matches Canopy's own prices
+ * for the same models: 18¢ for the Nano Banana Pro image priced at 6 here, 117¢
+ * for the 5 s Veo 3.1 Fast clip priced at 40, 91¢ for the Kling clip priced at 30.
+ */
+export const CENTS_PER_CREDIT = 3;
+
+/** Tool credits as Canopy shows credits (one credit is a dollar): 6 → "0.18". */
+export const platformCredits = (toolCredits: number) => ((toolCredits * CENTS_PER_CREDIT) / 100).toFixed(2);
+
 /** Does this image input take the open editor image when left empty? */
 export const bindsActive = (spec: InputSpec) => spec.kind === "image" && !spec.allowEmpty && Boolean(spec.optional || spec.bindActive);
 

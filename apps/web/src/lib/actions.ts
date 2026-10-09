@@ -1,6 +1,7 @@
 "use client";
 
 import { batchSize, runCost, toolById, validateInputs, MODELS, EDITOR_OPS } from "@fashion/core/tools";
+import { showCredits } from "./credits";
 import { track } from "./analytics";
 import { toolSettings } from "./prefs";
 import { api, downloadUrl, downloadZip, fileName, type AssetDTO, type RunDTO } from "./api";
@@ -94,7 +95,7 @@ export async function generate(toolId: string) {
   const settings = toolSettings(tool, ts, s.project?.preferences);
   const outputs = tool.outputs * batchSize(tool, inputs);
   const cost = runCost(tool, inputs, settings.resolution);
-  if ((s.me?.credits ?? 0) < cost) return s.toast(`Not enough credits — this run needs ${cost}.`, "error");
+  if (!s.me?.unlimitedCredits && (s.me?.credits ?? 0) < cost) return s.toast(`Not enough credits — this run needs ${showCredits(cost)}.`, "error");
   return start(toolId, inputs, settings, outputs);
 }
 

@@ -3,7 +3,8 @@ import { db } from "../db/client";
 import { assets, runs, type AssetMeta, type RunRow } from "../db/schema";
 import { sha256, storeImage } from "../media";
 import { capture } from "../analytics";
-import { getAsset, insertAsset, refundCredits } from "../data";
+import { getAsset, insertAsset } from "../data";
+import { settlePendingHolds, settleRun } from "../platform-credits";
 import { newId } from "../ids";
 import { extFor, getObjectBuffer, presignGet, putObject } from "../storage";
 import { EDITOR_OPS, toolById } from "../tools/registry";
@@ -448,9 +449,11 @@ async function execute(ctx: Ctx) {
           lastErr = e;
           if (isPolicy(e)) break;
           console.warn(`[engine] video step failed, trying next:`, (e as Error).message.slice(0, 160));
-          // Forget the failed job so the next step submits fresh.
-          await db().update(runs).set({ providerRef: {} }).where(eq(runs.id, run.id));
-          run.providerRef = {};
+          // Forget the failed job so the next step submits fresh. Only the job:
+          // how the run is paid (providerRef.billing) stays with it.
+          const { queue: _failedJob, ...kept } = run.providerRef ?? {};
+          await db().update(runs).set({ providerRef: kept }).where(eq(runs.id, run.id));
+          run.providerRef = kept;
         }
       }
       if (!buf) throw lastErr ?? new ProviderError("Video generation failed", 502);
@@ -611,9 +614,8 @@ export async function executeRun(run: RunRow): Promise<void> {
       .set({ status: produced > 0 ? "succeeded" : "failed", finishedAt: new Date(), error: message })
       .where(eq(runs.id, run.id));
   }
-  // Refund whatever didn't get made (all of it on failure, the remainder on partial success).
-  const missing = Math.max(0, run.expected - produced);
-  if (missing > 0) await refundCredits(run.userId, Math.round(perOutput * missing), produced ? "partial refund" : "refund", run.id);
+  // Pay for what was made and give back the rest (all of it on failure, the remainder on partial success).
+  await settleRun(run, produced, produced ? "partial refund" : "refund");
   capture(produced > 0 ? "run_succeeded" : "run_failed", run.userId, {
     tool: run.tool,
     project_id: run.projectId,
@@ -651,10 +653,9 @@ export async function recoverStale(maxAgeMs = 20 * 60_000) {
       .set({ status: done.length ? "succeeded" : "failed", finishedAt: new Date(), error: "Generation was interrupted. Unused credits were refunded." })
       .where(and(eq(runs.id, r.id), eq(runs.status, "running")))
       .returning();
-    if (updated.length) {
-      const missing = Math.max(0, r.expected - done.length);
-      if (missing) await refundCredits(r.userId, Math.round((r.cost / Math.max(1, r.expected)) * missing), "refund (interrupted)", r.id);
-    }
+    if (updated.length) await settleRun(r, done.length, "refund (interrupted)");
   }
+  // Runs that ended while Canopy was out of reach still hold credits on a wallet: end those holds.
+  await settlePendingHolds().catch((e) => console.warn("[engine] settling open credit holds failed:", (e as Error).message));
   return stale.length;
 }
